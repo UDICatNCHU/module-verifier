@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { resolve } from 'node:path'
 import { loadModules, findModule } from '../src/module-loader.ts'
 import { verifyModule } from '../src/verifier.ts'
-import type { StudentCourse } from '../src/models.ts'
+import type { StudentCourse, Module, CourseGroup } from '../src/models.ts'
 
 const DATA_PATH = resolve(import.meta.dirname, '../modules_data.json')
 const modules = loadModules(DATA_PATH)
@@ -139,5 +139,110 @@ describe('verifier - empty student courses', () => {
     expect(result.is_certified).toBe(false)
     expect(result.total_courses_matched).toBe(0)
     expect(result.total_credits_matched).toBe(0)
+  })
+})
+
+// ─────────────────────────────────────────────────────────
+// course_code matching tests (生科系 專題研究 scenario)
+// ─────────────────────────────────────────────────────────
+
+/** Helper: build a minimal Module with course_code support */
+function makeModule(groups: CourseGroup[]): Module {
+  return {
+    key: 'test_module',
+    name_zh: '測試模組',
+    name_en: 'Test Module',
+    unit: '測試單位',
+    college: '測試學院',
+    groups,
+    all_courses: groups.flatMap(g => g.courses),
+    certification: { min_courses: 4, min_credits: 12 },
+  }
+}
+
+describe('verifier - course_code matching', () => {
+  // Simulates 生科系 scenario:
+  // Module defines "專題研究" with course_code "BL301"
+  // Student records have "專題研究(一)" code "BL301" + "專題研究(二)" code "BL301"
+  const mod = makeModule([
+    {
+      label: '生物化學',
+      rule: { type: 'required', notes: [] },
+      courses: [{ name_zh: '生物化學', name_en: 'Biochemistry', credits: 6, offering_unit: '生科系', remark: '基礎課程' }],
+    },
+    {
+      label: '動物生理學',
+      rule: { type: 'required', notes: [] },
+      courses: [{ name_zh: '動物生理學', name_en: 'Animal Physiology', credits: 3, offering_unit: '生科系', remark: '核心課程' }],
+    },
+    {
+      label: '[應用課程] 7選2',
+      rule: { type: 'choose_m_from_n', category: '應用課程', choose_m: 2, choose_n: 7, notes: [] },
+      courses: [
+        { name_zh: '神經生理學', name_en: 'Neurophysiology', credits: 3, offering_unit: '生科系', remark: '應用課程(七選二)' },
+        { name_zh: '免疫學', name_en: 'Immunology', credits: 3, offering_unit: '生科系', remark: '應用課程(七選二)' },
+        { name_zh: '專題研究', name_en: 'Undergraduate Research', credits: 2, offering_unit: '生科系', remark: '應用課程(七選二) 選修兩學期', course_code: 'BL301' },
+      ],
+    },
+  ])
+
+  it('PASS: course_code matches 專題研究(一)+(二) across 2 semesters', () => {
+    const student: StudentCourse[] = [
+      { name: '生物化學', credits: 6 },
+      { name: '動物生理學', credits: 3 },
+      { name: '神經生理學', credits: 3 },
+      // Different names but same course_code — should match as 2 semesters
+      { name: '專題研究(一)', credits: 2, semester: '114-1', course_code: 'BL301' },
+      { name: '專題研究(二)', credits: 2, semester: '114-2', course_code: 'BL301' },
+    ]
+    const result = verifyModule(mod, student)
+    expect(result.is_certified).toBe(true)
+    expect(result.total_courses_matched).toBeGreaterThanOrEqual(4)
+  })
+
+  it('FAIL: course_code matches but only 1 semester for 選修兩學期', () => {
+    const student: StudentCourse[] = [
+      { name: '生物化學', credits: 6 },
+      { name: '動物生理學', credits: 3 },
+      { name: '神經生理學', credits: 3 },
+      // Only 1 semester — 選修兩學期 not met
+      { name: '專題研究(一)', credits: 2, semester: '114-1', course_code: 'BL301' },
+    ]
+    const result = verifyModule(mod, student)
+    // 專題研究 should NOT count since only 1 semester
+    const appGroup = result.group_results.find(g =>
+      g.rule.type === 'choose_m_from_n' && g.rule.category === '應用課程'
+    )
+    expect(appGroup).toBeDefined()
+    expect(appGroup!.courses_matched).not.toContain('專題研究')
+    // Only 神經生理學 matched → 1 of 2 needed → group not satisfied
+    expect(appGroup!.courses_matched).toEqual(['神經生理學'])
+  })
+
+  it('falls back to name matching when no course_code', () => {
+    const student: StudentCourse[] = [
+      { name: '生物化學', credits: 6 },
+      { name: '動物生理學', credits: 3 },
+      { name: '神經生理學', credits: 3 },
+      // No course_code — falls back to exact name match
+      { name: '專題研究', credits: 2, semester: '114-1' },
+      { name: '專題研究', credits: 2, semester: '114-2' },
+    ]
+    const result = verifyModule(mod, student)
+    expect(result.is_certified).toBe(true)
+  })
+
+  it('name fallback: 專題研究 with only 1 semester still fails', () => {
+    const student: StudentCourse[] = [
+      { name: '生物化學', credits: 6 },
+      { name: '動物生理學', credits: 3 },
+      { name: '神經生理學', credits: 3 },
+      { name: '專題研究', credits: 2, semester: '114-1' },
+    ]
+    const result = verifyModule(mod, student)
+    const appGroup = result.group_results.find(g =>
+      g.rule.type === 'choose_m_from_n' && g.rule.category === '應用課程'
+    )
+    expect(appGroup!.courses_matched).not.toContain('專題研究')
   })
 })

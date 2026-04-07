@@ -14,37 +14,64 @@ function normalizeName(name: string): string {
     .replace(/[Π]/g, 'II')
 }
 
-/** Build a lookup map from student courses */
-function buildStudentLookup(studentCourses: readonly StudentCourse[]): Map<string, StudentCourse[]> {
-  const map = new Map<string, StudentCourse[]>()
+/** Indexes for matching student courses by name and by course_code */
+interface StudentLookup {
+  readonly byName: Map<string, StudentCourse[]>
+  readonly byCode: Map<string, StudentCourse[]>
+}
+
+/** Build lookup indexes from student courses */
+function buildStudentLookup(studentCourses: readonly StudentCourse[]): StudentLookup {
+  const byName = new Map<string, StudentCourse[]>()
+  const byCode = new Map<string, StudentCourse[]>()
   for (const sc of studentCourses) {
-    const key = normalizeName(sc.name)
-    const existing = map.get(key) ?? []
-    existing.push(sc)
-    map.set(key, existing)
+    const nameKey = normalizeName(sc.name)
+    const nameList = byName.get(nameKey) ?? []
+    nameList.push(sc)
+    byName.set(nameKey, nameList)
+
+    if (sc.course_code) {
+      const codeList = byCode.get(sc.course_code) ?? []
+      codeList.push(sc)
+      byCode.set(sc.course_code, codeList)
+    }
   }
-  return map
+  return { byName, byCode }
+}
+
+/** Find all student records matching a module course (code-first, then name) */
+function findAllMatches(
+  lookup: StudentLookup,
+  courseCode: string | undefined,
+  courseName: string,
+): StudentCourse[] {
+  // Prefer course_code match when both sides have codes
+  if (courseCode) {
+    const byCode = lookup.byCode.get(courseCode)
+    if (byCode && byCode.length > 0) return byCode
+  }
+  // Fall back to name match
+  const key = normalizeName(courseName)
+  return lookup.byName.get(key) ?? []
 }
 
 /** Check if a student has taken a specific course */
 function findMatch(
-  lookup: Map<string, StudentCourse[]>,
+  lookup: StudentLookup,
+  courseCode: string | undefined,
   courseName: string,
 ): StudentCourse | undefined {
-  const key = normalizeName(courseName)
-  const matches = lookup.get(key)
-  return matches?.[0]
+  return findAllMatches(lookup, courseCode, courseName)[0]
 }
 
 /** Count semester occurrences for a course (for 選修兩學期 requirement) */
 function countSemesters(
-  lookup: Map<string, StudentCourse[]>,
+  lookup: StudentLookup,
+  courseCode: string | undefined,
   courseName: string,
 ): number {
-  const key = normalizeName(courseName)
-  const matches = lookup.get(key)
-  if (!matches) return 0
-  // Count distinct semesters
+  const matches = findAllMatches(lookup, courseCode, courseName)
+  if (matches.length === 0) return 0
   const semesters = new Set(matches.map(m => m.semester ?? 'unknown'))
   return semesters.size
 }
@@ -52,7 +79,7 @@ function countSemesters(
 /** Verify a single course group */
 function verifyGroup(
   group: CourseGroup,
-  lookup: Map<string, StudentCourse[]>,
+  lookup: StudentLookup,
 ): GroupResult {
   const coursesInGroup = group.courses.map(c => c.name_zh)
   const coursesMatched: string[] = []
@@ -60,13 +87,13 @@ function verifyGroup(
 
   // Find which courses in this group the student has taken
   for (const course of group.courses) {
-    const match = findMatch(lookup, course.name_zh)
+    const match = findMatch(lookup, course.course_code, course.name_zh)
     if (match) {
       // Check for 選修兩學期 — this is a per-COURSE constraint from the original remark,
       // not a group-level one. Check the individual course's remark.
       const courseRequiresTwoSemesters = course.remark?.includes('選修兩學期') ?? false
       if (courseRequiresTwoSemesters) {
-        const semCount = countSemesters(lookup, course.name_zh)
+        const semCount = countSemesters(lookup, course.course_code, course.name_zh)
         if (semCount >= 2) {
           coursesMatched.push(course.name_zh)
           creditsMatched += match.credits
@@ -153,7 +180,7 @@ function verifyGroup(
  */
 function verifyCrossGroupModule(
   groups: readonly CourseGroup[],
-  lookup: Map<string, StudentCourse[]>,
+  lookup: StudentLookup,
 ): readonly GroupResult[] {
   // Separate Level 1, Level 2, and other groups
   const level1Groups = groups.filter(g => g.rule.cross_group_level === 1)
@@ -178,7 +205,7 @@ function verifyCrossGroupModule(
     let tagMatched = false
     for (const g of tagGroups) {
       for (const c of g.courses) {
-        if (findMatch(lookup, c.name_zh)) {
+        if (findMatch(lookup, c.course_code, c.name_zh)) {
           tagMatched = true
           satisfiedCategories.add(tag)
           break
@@ -191,7 +218,7 @@ function verifyCrossGroupModule(
   const level1Satisfied = satisfiedCategories.size >= 2
   // Create a single Level 1 result
   const allL1Courses = level1Groups.flatMap(g => g.courses)
-  const l1Matched = allL1Courses.filter(c => findMatch(lookup, c.name_zh))
+  const l1Matched = allL1Courses.filter(c => findMatch(lookup, c.course_code, c.name_zh))
   level1Results.push({
     label: `Level 1: 三大類別選2類，每類各選一門`,
     rule: { type: 'choose_m_from_n', choose_m: 2, choose_n: 3, notes: [] },
@@ -210,7 +237,7 @@ function verifyCrossGroupModule(
     satisfiedCategories.has(g.rule.subcategory_tag ?? '')
   )
   const l2EligibleCourses = l2Eligible.flatMap(g => g.courses)
-  const l2Matched = l2EligibleCourses.filter(c => findMatch(lookup, c.name_zh))
+  const l2Matched = l2EligibleCourses.filter(c => findMatch(lookup, c.course_code, c.name_zh))
   const level2Satisfied = l2Matched.length >= 1
 
   level1Results.push({
@@ -251,8 +278,8 @@ export function verifyModule(
     for (const name of gr.courses_matched) {
       if (!allMatchedNames.has(name)) {
         allMatchedNames.add(name)
-        // Find the actual student credit for this course
-        const match = findMatch(lookup, name)
+        // Find the actual student credit for this course (name-only lookup for dedup)
+        const match = findMatch(lookup, undefined, name)
         if (match) totalCredits += match.credits
       }
     }

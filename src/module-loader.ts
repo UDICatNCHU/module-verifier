@@ -19,6 +19,7 @@ function parseCourse(raw: RawCourseData): ModuleCourse {
     credits: extractCredits(raw),
     offering_unit: (raw.開課單位 ?? '').trim(),
     remark: raw.備註?.trim() ?? null,
+    course_code: raw.課程代碼?.trim() || undefined,
   }
 }
 

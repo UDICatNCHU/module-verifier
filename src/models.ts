@@ -5,6 +5,7 @@ export interface ModuleCourse {
   readonly credits: number
   readonly offering_unit: string
   readonly remark: string | null
+  readonly course_code?: string
 }
 
 export type RuleType =
@@ -60,6 +61,7 @@ export interface StudentCourse {
   readonly name: string
   readonly credits: number
   readonly semester?: string // e.g. "113-1"
+  readonly course_code?: string
 }
 
 /** Student profile with course records */
@@ -124,4 +126,5 @@ export interface RawCourseData {
   readonly 規劃要點?: Record<string, string>
   readonly 開課單位: string
   readonly 備註?: string
+  readonly 課程代碼?: string
 }
