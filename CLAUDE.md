@@ -53,12 +53,34 @@ modules_data.json
 - **選修兩學期 is per-course**: Checked via `course.remark`, not `group.rule.notes`, so merging doesn't incorrectly apply the constraint to all courses in the group.
 - **僅認定一門課 uses adjacency**: Consecutive courses with this remark form one pick-1 group; a gap (different remark) starts a new group.
 
+### Course code (科目內碼) matching
+
+`verifier.ts` uses **code-first matching**: when both module course and student record have `course_code`, match by code; otherwise fall back to name. This solves the 生科系「專題研究」problem where the same course appears with different names (專題研究(一)、專題研究(二)) but shares the same course code. `countSemesters()` also uses code-first to correctly count semesters across name variants.
+
+Currently `modules_data.json` has no `課程代碼` field yet — `module-loader.ts` is ready to parse it once the data is updated.
+
 ## Tests
 
-135 tests across 4 files. `test/complex-audit.test.ts` covers the hardest modules:
+139 tests across 4 files. `test/complex-audit.test.ts` covers the hardest modules:
 - 園藝學系 (|| prefix fragmentation)
 - 電機系 (僅認定一門課 adjacency with gaps)
 - 生機系 (reciprocal substitute courses)
 - 生命科學系 (選修兩學期 per-course constraint)
 - 物理學系 (3-tier credit pool)
 - 影像與視覺文化 (cross-group Level 1→2 dependency)
+
+`test/verifier.test.ts` includes course_code matching tests (code match across name variants, semester counting, name fallback).
+
+## Stakeholder notes (負責人回饋)
+
+Three hardest module categories identified (2026-04-07):
+
+1. **生科系 (動物生理、微生物科技、植物生理)** — 「專題研究」有多個科目內碼、全學年但不指定學期 → **已處理**: course_code matching
+2. **企管系** — 各層級至少 1 門 + 合計至少 4 門（唯一此設計的模組） → **待處理**: 資料尚未進入 `modules_data.json`，且目前架構無此驗證模式，需新增 per-tier minimum + global total 規則
+3. **台文學士 影像與視覺文化** — 各層級選修間具對應關係（唯一此設計） → **已處理**: `verifyCrossGroupModule()`
+
+## Pending work
+
+- **企管系模組**: 等資料加入後，需在 `verifier.ts` 新增「各 tier ≥1 門 + 合計 ≥N 門」驗證邏輯
+- **真實 API 串接**: 替換 `src/student-api.ts` 的 `fetchStudentInfo()` 為真實學生成績 API，確認回傳的 `course_code` 欄位格式
+- **modules_data.json 補課程代碼**: 目前 JSON 無 `課程代碼` 欄位，loader 已準備好，等資料更新即生效
