@@ -55,13 +55,24 @@ modules_data.json
 
 ### Course code (科目內碼) matching
 
-`verifier.ts` uses **code-first matching**: when both module course and student record have `course_code`, match by code; otherwise fall back to name. This solves the 生科系「專題研究」problem where the same course appears with different names (專題研究(一)、專題研究(二)) but shares the same course code. `countSemesters()` also uses code-first to correctly count semesters across name variants.
+`verifier.ts` uses **code-first matching**: when both module course and student record have `course_codes`, match by code; otherwise fall back to name. This solves the 生科系「專題研究」problem where the same course appears with different names (專題研究(一)、專題研究(二)) but shares the same course code. `countSemesters()` also uses code-first to correctly count semesters across name variants.
 
-Currently `modules_data.json` has no `課程代碼` field yet — `module-loader.ts` is ready to parse it once the data is updated.
+**Multi-code support**: `ModuleCourse.course_codes` is `readonly string[]` — one module course can map to multiple 科目內碼. This handles courses where semesters have different codes (e.g. 生科系 專題研究: `02603` in 上學期, `99501` in 下學期). In `modules_data.json`, multi-codes are stored comma-separated: `"課程代碼": "02603,99501"`. `module-loader.ts` splits on comma at load time. `StudentCourse.course_code` remains singular (each student record has one code).
+
+**Data status**: 486/505 courses have `課程代碼` in `modules_data.json`. 19 remain unresolved (ambiguous multi-department matches like 專題研究 in 歷史系/行銷系/植病系 etc.) — none affect the 4 departments under active testing.
+
+### Scripts
+
+| File | Purpose |
+|------|------|
+| `scripts/import-course-codes.ts` | 3-layer matching pipeline (exact → normalized → suffix-stripped) to auto-import 科目內碼 from Excel into `modules_data.json`. Run with `--apply` to write. |
+| `scripts/verify-4dept.ts` | Verify all students in a department against relevant modules. Usage: `npx tsx scripts/verify-4dept.ts 生科系` |
+| `scripts/lib/excel-reader.ts` | Read 科目內碼 Excel and 4dept student records (xlsx). |
+| `scripts/lib/normalize.ts` | Name normalization utilities (full-width→half-width, 臺→台, trailing numeral strip). |
 
 ## Tests
 
-139 tests across 4 files. `test/complex-audit.test.ts` covers the hardest modules:
+141 tests across 4 files. `test/complex-audit.test.ts` covers the hardest modules:
 - 園藝學系 (|| prefix fragmentation)
 - 電機系 (僅認定一門課 adjacency with gaps)
 - 生機系 (reciprocal substitute courses)
@@ -69,18 +80,25 @@ Currently `modules_data.json` has no `課程代碼` field yet — `module-loader
 - 物理學系 (3-tier credit pool)
 - 影像與視覺文化 (cross-group Level 1→2 dependency)
 
-`test/verifier.test.ts` includes course_code matching tests (code match across name variants, semester counting, name fallback).
+`test/verifier.test.ts` includes course_code matching tests (single-code match, multi-code across semesters, semester counting, name fallback).
 
 ## Stakeholder notes (負責人回饋)
 
 Three hardest module categories identified (2026-04-07):
 
-1. **生科系 (動物生理、微生物科技、植物生理)** — 「專題研究」有多個科目內碼、全學年但不指定學期 → **已處理**: course_code matching
+1. **生科系 (動物生理、微生物科技、植物生理)** — 「專題研究」有多個科目內碼、全學年但不指定學期 → **已處理**: multi-code `course_codes[]` matching + `countSemesters()`
 2. **企管系** — 各層級至少 1 門 + 合計至少 4 門（唯一此設計的模組） → **待處理**: 資料尚未進入 `modules_data.json`，且目前架構無此驗證模式，需新增 per-tier minimum + global total 規則
 3. **台文學士 影像與視覺文化** — 各層級選修間具對應關係（唯一此設計） → **已處理**: `verifyCrossGroupModule()`
+
+## Verified results (2026-04-10)
+
+4dept 學生驗證結果 (`scripts/verify-4dept.ts`):
+- **台文學士** (20人) × 影像與視覺文化: 0 人通過（跨院模組，課程重疊少）
+- **生科系** (91人) × 動物生理: 20 通過 / 微生物科技: 16 通過 / 植物生理: 1 通過（吳昌翰，multi-code fix 後才正確判定）
+- **資工系** (34人) × 資管系_資訊管理領域模組: 待驗證
 
 ## Pending work
 
 - **企管系模組**: 等資料加入後，需在 `verifier.ts` 新增「各 tier ≥1 門 + 合計 ≥N 門」驗證邏輯
 - **真實 API 串接**: 替換 `src/student-api.ts` 的 `fetchStudentInfo()` 為真實學生成績 API，確認回傳的 `course_code` 欄位格式
-- **modules_data.json 補課程代碼**: 目前 JSON 無 `課程代碼` 欄位，loader 已準備好，等資料更新即生效
+- **19 門課程代碼未解決**: 歷史系、行銷系、植病系、物理系、環工系、化工系、電機系、森林系、應經系的同名課程內碼不確定，不影響 4 系所測試

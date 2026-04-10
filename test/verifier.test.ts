@@ -181,7 +181,7 @@ describe('verifier - course_code matching', () => {
       courses: [
         { name_zh: '神經生理學', name_en: 'Neurophysiology', credits: 3, offering_unit: '生科系', remark: '應用課程(七選二)' },
         { name_zh: '免疫學', name_en: 'Immunology', credits: 3, offering_unit: '生科系', remark: '應用課程(七選二)' },
-        { name_zh: '專題研究', name_en: 'Undergraduate Research', credits: 2, offering_unit: '生科系', remark: '應用課程(七選二) 選修兩學期', course_code: 'BL301' },
+        { name_zh: '專題研究', name_en: 'Undergraduate Research', credits: 2, offering_unit: '生科系', remark: '應用課程(七選二) 選修兩學期', course_codes: ['BL301'] },
       ],
     },
   ])
@@ -238,6 +238,64 @@ describe('verifier - course_code matching', () => {
       { name: '動物生理學', credits: 3 },
       { name: '神經生理學', credits: 3 },
       { name: '專題研究', credits: 2, semester: '114-1' },
+    ]
+    const result = verifyModule(mod, student)
+    const appGroup = result.group_results.find(g =>
+      g.rule.type === 'choose_m_from_n' && g.rule.category === '應用課程'
+    )
+    expect(appGroup!.courses_matched).not.toContain('專題研究')
+  })
+})
+
+describe('verifier - multi-code matching (上下學期不同碼)', () => {
+  // Simulates 生科系 scenario where 專題研究 has different codes per semester:
+  // 上學期 code "02603", 下學期 code "99501"
+  const mod = makeModule([
+    {
+      label: '生物化學',
+      rule: { type: 'required', notes: [] },
+      courses: [{ name_zh: '生物化學', name_en: 'Biochemistry', credits: 6, offering_unit: '生科系', remark: '基礎課程' }],
+    },
+    {
+      label: '植物生理學',
+      rule: { type: 'required', notes: [] },
+      courses: [{ name_zh: '植物生理學', name_en: 'Plant Physiology', credits: 3, offering_unit: '生科系', remark: '核心課程' }],
+    },
+    {
+      label: '[應用課程] 7選2',
+      rule: { type: 'choose_m_from_n', category: '應用課程', choose_m: 2, choose_n: 7, notes: [] },
+      courses: [
+        { name_zh: '植物組織培養及實驗', name_en: 'Plant Tissue Culture', credits: 3, offering_unit: '生科系', remark: '應用課程(七選二)' },
+        { name_zh: '專題研究', name_en: 'Undergraduate Research', credits: 2, offering_unit: '生科系', remark: '應用課程(七選二) 選修兩學期', course_codes: ['02603', '99501'] },
+      ],
+    },
+  ])
+
+  it('PASS: 上下學期不同碼都匹配到', () => {
+    const student: StudentCourse[] = [
+      { name: '生物化學', credits: 6, semester: '112-1' },
+      { name: '植物生理學', credits: 3, semester: '114-1' },
+      { name: '植物組織培養及實驗', credits: 3, semester: '112-1' },
+      // ��下學期不同碼 — 兩碼都在模組的 course_codes 裡
+      { name: '專題研究', credits: 1, semester: '112-1', course_code: '02603' },
+      { name: '專題研究', credits: 1, semester: '112-2', course_code: '99501' },
+    ]
+    const result = verifyModule(mod, student)
+    const appGroup = result.group_results.find(g =>
+      g.rule.type === 'choose_m_from_n' && g.rule.category === '應用課程'
+    )
+    // 專題研究兩學期都被匹配到（透過多碼），滿足選修兩學期
+    expect(appGroup!.courses_matched).toContain('專題研究')
+    expect(result.is_certified).toBe(true)
+  })
+
+  it('FAIL: ��有上學期碼，選修兩學期未滿足', () => {
+    const student: StudentCourse[] = [
+      { name: '生物化學', credits: 6, semester: '112-1' },
+      { name: '植物生理學', credits: 3, semester: '114-1' },
+      { name: '植物組織培養及實驗', credits: 3, semester: '112-1' },
+      // 只有一學期
+      { name: '專題研究', credits: 1, semester: '112-1', course_code: '02603' },
     ]
     const result = verifyModule(mod, student)
     const appGroup = result.group_results.find(g =>

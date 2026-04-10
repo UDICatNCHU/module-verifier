@@ -5,7 +5,7 @@ export interface ModuleCourse {
   readonly credits: number
   readonly offering_unit: string
   readonly remark: string | null
-  readonly course_code?: string
+  readonly course_codes?: readonly string[]
 }
 
 export type RuleType =
