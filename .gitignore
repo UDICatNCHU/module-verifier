@@ -3,3 +3,4 @@ dist/
 *.tsbuildinfo
 .claude/plans/
 scripts/output/
+feedback.json

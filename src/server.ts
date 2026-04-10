@@ -3,8 +3,9 @@ import { serve } from '@hono/node-server'
 import { resolve } from 'node:path'
 import { loadModules, getModulesByCollege, findModule } from './module-loader.ts'
 import { verifyModule } from './verifier.ts'
-import { fetchStudentInfo } from './student-api.ts'
-import type { Module, StudentCourse, StudentInfo, VerificationResult } from './models.ts'
+import { fetchStudentInfo, getAllStudents, getStudentsByDepartment, getDepartments } from './student-api.ts'
+import { addFeedback, getFeedback, getAllFeedback, getFeedbackSummary } from './feedback-store.ts'
+import type { Module, StudentCourse, StudentInfo, VerificationResult, CourseMatchDetail } from './models.ts'
 
 const DATA_PATH = resolve(import.meta.dirname, '../modules_data.json')
 const modules = loadModules(DATA_PATH)
@@ -29,7 +30,7 @@ function layout(title: string, body: string): string {
       line-height: 1.6;
       padding: 20px;
     }
-    .container { max-width: 900px; margin: 0 auto; }
+    .container { max-width: 960px; margin: 0 auto; }
     h1 { font-size: 1.8rem; margin-bottom: 8px; color: #16213e; }
     h2 { font-size: 1.3rem; margin: 24px 0 12px; color: #0f3460; }
     h3 { font-size: 1.1rem; margin: 16px 0 8px; color: #333; }
@@ -73,6 +74,7 @@ function layout(title: string, body: string): string {
     th { background: #f8f9fb; font-weight: 600; color: #333; }
     .check { color: #27ae60; font-weight: bold; }
     .cross { color: #e74c3c; font-weight: bold; }
+    .dim { color: #aaa; }
     .tag {
       display: inline-block;
       padding: 2px 8px;
@@ -120,13 +122,6 @@ function layout(title: string, body: string): string {
       margin-bottom: 8px;
     }
     .group-title { font-weight: 600; }
-    .course-item {
-      padding: 6px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .course-item + .course-item { border-top: 1px solid #f0f0f0; }
     .note {
       font-size: 0.85rem;
       color: #856404;
@@ -141,6 +136,14 @@ function layout(title: string, body: string): string {
       padding: 12px 16px;
       border-radius: 8px;
       border: 1px solid #f5c6cb;
+      margin-bottom: 16px;
+    }
+    .flash-msg {
+      background: #d4edda;
+      color: #155724;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #c3e6cb;
       margin-bottom: 16px;
     }
     form { margin: 0; }
@@ -158,6 +161,7 @@ function layout(title: string, body: string): string {
     .btn:hover { background: #16213e; }
     .btn-secondary { background: #6c757d; }
     .btn-secondary:hover { background: #5a6268; }
+    .btn-sm { padding: 6px 14px; font-size: 0.85rem; }
     .back-link { margin-bottom: 16px; display: inline-block; }
     .search-form {
       display: flex;
@@ -179,10 +183,11 @@ function layout(title: string, body: string): string {
       gap: 16px;
       align-items: center;
       margin-bottom: 8px;
+      flex-wrap: wrap;
     }
     .student-name { font-size: 1.5rem; font-weight: 700; }
     .course-table-wrap {
-      max-height: 300px;
+      max-height: 400px;
       overflow-y: auto;
       border: 1px solid #eee;
       border-radius: 8px;
@@ -193,10 +198,61 @@ function layout(title: string, body: string): string {
       gap: 16px;
     }
     @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+    .dept-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .dept-card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.2s;
+    }
+    .dept-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+    .dept-card .dept-name { font-weight: 600; font-size: 1.1rem; color: #0f3460; }
+    .dept-card .dept-count { color: #888; font-size: 0.9rem; }
+    .match-row-unmatched td { color: #aaa; background: #fafafa; }
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 60px;
+      outline: none;
+    }
+    textarea:focus { border-color: #0f3460; }
+    select {
+      padding: 8px 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+      background: white;
+    }
+    select:focus { border-color: #0f3460; }
+    .nav-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+    .nav-bar a { text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="nav-bar">
+      <a href="/">首頁</a>
+      <a href="/departments">系所總覽</a>
+      <a href="/feedback">回饋總覽</a>
+    </div>
     ${body}
   </div>
 </body>
@@ -210,6 +266,13 @@ app.get('/', (c) => {
     ? `<div class="error-msg">${escapeHtml(error)}</div>`
     : ''
 
+  const allStudents = getAllStudents()
+  const depts = getDepartments()
+  const deptStats = depts.map(d => {
+    const count = getStudentsByDepartment(d).length
+    return `${d} ${count}人`
+  }).join(', ')
+
   return c.html(layout('領域模組認證檢核系統', `
     <h1>領域模組認證檢核系統</h1>
     <p class="subtitle">國立中興大學 教務處</p>
@@ -218,11 +281,14 @@ app.get('/', (c) => {
       ${errorHtml}
       <form action="/student" method="GET" class="search-form">
         <input type="text" name="id" class="search-input"
-               placeholder="請輸入學號 (例: D1234001)" required autofocus>
+               placeholder="請輸入學號" required autofocus>
         <button type="submit" class="btn">查詢</button>
       </form>
       <p style="margin-top: 12px; color: #888; font-size: 0.85rem;">
-        測試用學號: D1234001 (王小明)、D1234002 (李美玲)、D1234003 (張志豪)、D1234004 (陳怡君)
+        已載入 ${allStudents.length} 位學生 (${deptStats})
+      </p>
+      <p style="margin-top: 6px; font-size: 0.85rem;">
+        <a href="/departments">按系所瀏覽 &rarr;</a>
       </p>
     </div>
   `))
@@ -240,15 +306,16 @@ app.get('/student', async (c) => {
     return c.redirect(`/?error=找不到學號 ${encodeURIComponent(studentId)} 的學生資料`)
   }
 
-  // Student course table
+  // Student course table with course_code column
   let courseTableHtml = `<table>
-    <thead><tr><th>課程名稱</th><th>學分</th><th>學期</th></tr></thead>
+    <thead><tr><th>課程名稱</th><th>學分</th><th>學期</th><th>內碼</th></tr></thead>
     <tbody>`
   for (const sc of student.courses) {
     courseTableHtml += `<tr>
       <td>${escapeHtml(sc.name)}</td>
       <td>${sc.credits}</td>
       <td>${escapeHtml(sc.semester ?? '-')}</td>
+      <td style="font-size:0.8rem;color:#888;">${escapeHtml(sc.course_code ?? '-')}</td>
     </tr>`
   }
   courseTableHtml += `</tbody></table>`
@@ -314,9 +381,228 @@ app.get('/student/:studentId/verify/:moduleKey', async (c) => {
 
   const result = verifyModule(mod, student.courses)
 
+  const feedbackFlash = c.req.query('feedback') === 'saved'
+    ? '<div class="flash-msg">回饋已儲存，感謝您的協助！</div>'
+    : ''
+
   return c.html(layout(`認證結果 - ${student.name}`, `
     <a href="/student?id=${encodeURIComponent(student.student_id)}" class="back-link">&larr; 返回選擇模組</a>
+    ${feedbackFlash}
     ${renderResult(result, mod, student)}
+  `))
+})
+
+// ─── Department overview ───
+app.get('/departments', (c) => {
+  const depts = getDepartments()
+  let cardsHtml = ''
+  for (const dept of depts) {
+    const count = getStudentsByDepartment(dept).length
+    cardsHtml += `<a href="/department/${encodeURIComponent(dept)}" class="dept-card">
+      <div class="dept-name">${escapeHtml(dept)}</div>
+      <div class="dept-count">${count} 位學生</div>
+    </a>`
+  }
+
+  return c.html(layout('系所總覽', `
+    <h1>系所總覽</h1>
+    <p class="subtitle">選擇系所查看學生列表與批次驗證</p>
+    <div class="dept-grid">${cardsHtml}</div>
+  `))
+})
+
+// ─── Department detail + batch verify ───
+app.get('/department/:name', (c) => {
+  const deptName = decodeURIComponent(c.req.param('name'))
+  const students = getStudentsByDepartment(deptName)
+  const selectedModule = c.req.query('module')
+
+  if (students.length === 0) {
+    return c.html(layout('系所不存在', `<h1>找不到系所: ${escapeHtml(deptName)}</h1>`), 404)
+  }
+
+  // Module selector
+  let moduleSelectorHtml = `<form method="GET" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
+    <select name="module">
+      <option value="">-- 選擇模組進行批次驗證 --</option>`
+  for (const [college, mods] of modulesByCollege) {
+    moduleSelectorHtml += `<optgroup label="${escapeHtml(college)}">`
+    for (const m of mods) {
+      const selected = selectedModule === m.key ? ' selected' : ''
+      moduleSelectorHtml += `<option value="${escapeHtml(m.key)}"${selected}>${escapeHtml(m.name_zh)}</option>`
+    }
+    moduleSelectorHtml += `</optgroup>`
+  }
+  moduleSelectorHtml += `</select>
+    <button type="submit" class="btn btn-sm">驗證</button>
+  </form>`
+
+  let contentHtml = ''
+
+  if (selectedModule) {
+    const mod = findModule(modules, selectedModule)
+    if (!mod) {
+      contentHtml = '<div class="error-msg">找不到該模組</div>'
+    } else {
+      // Batch verify
+      const results = students.map(s => {
+        const result = verifyModule(mod, s.courses)
+        return { student: s, result }
+      }).sort((a, b) => {
+        if (a.result.is_certified !== b.result.is_certified) return a.result.is_certified ? -1 : 1
+        return b.result.total_credits_matched - a.result.total_credits_matched
+      })
+
+      const passCount = results.filter(r => r.result.is_certified).length
+
+      contentHtml = `
+        <div class="card">
+          <h2>${escapeHtml(mod.name_zh)}</h2>
+          <p class="module-meta">認證要求: ${mod.certification.min_courses} 門 / ${mod.certification.min_credits} 學分</p>
+          <div class="result-banner ${passCount > 0 ? 'result-pass' : 'result-fail'}">
+            通過 ${passCount} / ${students.length} 人
+          </div>
+          <div class="course-table-wrap">
+            <table>
+              <thead><tr><th>學號</th><th>姓名</th><th>結果</th><th>課程</th><th>學分</th><th>未達原因</th><th></th></tr></thead>
+              <tbody>`
+
+      for (const { student: s, result: r } of results) {
+        const tag = r.is_certified
+          ? '<span class="tag tag-pass">PASS</span>'
+          : '<span class="tag tag-fail">FAIL</span>'
+        const reasons = r.is_certified ? '' : escapeHtml(r.unmet_reasons.join('; ')).substring(0, 80)
+        contentHtml += `<tr>
+          <td>${escapeHtml(s.student_id)}</td>
+          <td>${escapeHtml(s.name)}</td>
+          <td>${tag}</td>
+          <td>${r.total_courses_matched}/${r.required_courses}</td>
+          <td>${r.total_credits_matched}/${r.required_credits}</td>
+          <td style="font-size:0.8rem;max-width:200px;">${reasons}</td>
+          <td><a href="/student/${encodeURIComponent(s.student_id)}/verify/${encodeURIComponent(mod.key)}" class="btn btn-sm btn-secondary">詳細</a></td>
+        </tr>`
+      }
+
+      contentHtml += `</tbody></table></div></div>`
+    }
+  } else {
+    // Student list (no module selected)
+    contentHtml = `<div class="card">
+      <div class="course-table-wrap">
+        <table>
+          <thead><tr><th>學號</th><th>姓名</th><th>修課數</th><th>總學分</th><th></th></tr></thead>
+          <tbody>`
+
+    for (const s of students) {
+      const totalCredits = s.courses.reduce((sum, c) => sum + c.credits, 0)
+      contentHtml += `<tr>
+        <td>${escapeHtml(s.student_id)}</td>
+        <td>${escapeHtml(s.name)}</td>
+        <td>${s.courses.length}</td>
+        <td>${totalCredits}</td>
+        <td><a href="/student?id=${encodeURIComponent(s.student_id)}" class="btn btn-sm btn-secondary">查看</a></td>
+      </tr>`
+    }
+
+    contentHtml += `</tbody></table></div></div>`
+  }
+
+  return c.html(layout(`${deptName} - 系所總覽`, `
+    <a href="/departments" class="back-link">&larr; 返回系所列表</a>
+    <h1>${escapeHtml(deptName)}</h1>
+    <p class="subtitle">${students.length} 位學生</p>
+    ${moduleSelectorHtml}
+    ${contentHtml}
+  `))
+})
+
+// ─── Feedback submission ───
+app.post('/feedback', async (c) => {
+  const body = await c.req.parseBody()
+  const studentId = String(body['student_id'] ?? '')
+  const moduleKey = String(body['module_key'] ?? '')
+  const isCorrect = body['is_correct'] === 'yes'
+  const comment = String(body['comment'] ?? '').trim()
+
+  if (studentId && moduleKey) {
+    addFeedback({
+      student_id: studentId,
+      module_key: moduleKey,
+      is_correct: isCorrect,
+      comment,
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  return c.redirect(
+    `/student/${encodeURIComponent(studentId)}/verify/${encodeURIComponent(moduleKey)}?feedback=saved`,
+  )
+})
+
+// ─── Feedback dashboard ───
+app.get('/feedback', (c) => {
+  const filter = c.req.query('filter')
+  const summary = getFeedbackSummary()
+  let entries = getAllFeedback()
+
+  if (filter === 'correct') entries = entries.filter(e => e.is_correct)
+  if (filter === 'incorrect') entries = entries.filter(e => !e.is_correct)
+
+  // Sort by timestamp desc
+  entries = [...entries].sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+
+  let tableHtml = ''
+  if (entries.length === 0) {
+    tableHtml = '<p style="color:#888;">尚無回饋資料</p>'
+  } else {
+    tableHtml = `<div class="course-table-wrap"><table>
+      <thead><tr><th>學號</th><th>模組</th><th>結果</th><th>備註</th><th>時間</th><th></th></tr></thead>
+      <tbody>`
+    for (const e of entries) {
+      const tag = e.is_correct
+        ? '<span class="tag tag-pass">正確</span>'
+        : '<span class="tag tag-fail">不正確</span>'
+      const time = e.timestamp.substring(0, 16).replace('T', ' ')
+      const modName = findModule(modules, e.module_key)?.name_zh ?? e.module_key
+      tableHtml += `<tr>
+        <td>${escapeHtml(e.student_id)}</td>
+        <td>${escapeHtml(modName)}</td>
+        <td>${tag}</td>
+        <td style="font-size:0.85rem;max-width:200px;">${escapeHtml(e.comment || '-')}</td>
+        <td style="font-size:0.8rem;color:#888;">${time}</td>
+        <td><a href="/student/${encodeURIComponent(e.student_id)}/verify/${encodeURIComponent(e.module_key)}" class="btn btn-sm btn-secondary">查看</a></td>
+      </tr>`
+    }
+    tableHtml += `</tbody></table></div>`
+  }
+
+  const activeFilter = (f: string | undefined) => f === filter ? 'font-weight:700;' : ''
+
+  return c.html(layout('回饋總覽', `
+    <h1>回饋總覽</h1>
+    <div class="stat-row">
+      <div class="stat-item">
+        <div class="stat-value">${summary.total}</div>
+        <div class="stat-label">總回饋數</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" style="color:#27ae60;">${summary.correct}</div>
+        <div class="stat-label">正確</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" style="color:#e74c3c;">${summary.incorrect}</div>
+        <div class="stat-label">不正確</div>
+      </div>
+    </div>
+    <div style="margin-bottom: 16px; font-size: 0.9rem;">
+      篩選:
+      <a href="/feedback" style="${activeFilter(undefined)}">全部</a> |
+      <a href="/feedback?filter=correct" style="${activeFilter('correct')}">正確</a> |
+      <a href="/feedback?filter=incorrect" style="${activeFilter('incorrect')}">不正確</a>
+    </div>
+    <div class="card">
+      ${tableHtml}
+    </div>
   `))
 })
 
@@ -372,17 +658,49 @@ function renderResult(result: VerificationResult, mod: Module, student: StudentI
       <span class="tag ${gr.is_satisfied ? 'tag-pass' : 'tag-fail'}">${escapeHtml(gr.detail)}</span>
     </div>`
 
-    for (const courseName of gr.courses_in_group) {
-      const matched = gr.courses_matched.includes(courseName)
-      const icon = matched
-        ? '<span class="check">&#10003;</span>'
-        : '<span class="cross">&mdash;</span>'
-      const text = matched ? courseName : `${courseName} (未修)`
-      groupsHtml += `<div class="course-item">
-        <span>${icon} ${escapeHtml(text)}</span>
-      </div>`
+    // Build match detail lookup
+    const detailMap = new Map<string, CourseMatchDetail>()
+    if (gr.match_details) {
+      for (const d of gr.match_details) {
+        detailMap.set(d.module_course_name, d)
+      }
     }
-    groupsHtml += `</div>`
+
+    // Render as detailed table
+    groupsHtml += `<table style="font-size:0.9rem;">
+      <thead><tr><th>模組課程</th><th>比對</th><th>學生課程</th><th>學分</th><th>學期</th><th>比對方式</th></tr></thead>
+      <tbody>`
+
+    for (const courseName of gr.courses_in_group) {
+      const detail = detailMap.get(courseName)
+      if (detail) {
+        const nameDisplay = detail.student_course_name !== detail.module_course_name
+          ? escapeHtml(detail.student_course_name)
+          : escapeHtml(detail.student_course_name)
+        const methodTag = detail.match_method === 'code'
+          ? '<span class="tag tag-info">內碼</span>'
+          : '<span class="tag tag-group">名稱</span>'
+        groupsHtml += `<tr>
+          <td>${escapeHtml(courseName)}</td>
+          <td><span class="check">&#10003;</span></td>
+          <td>${nameDisplay}</td>
+          <td>${detail.credits}</td>
+          <td>${escapeHtml(detail.semester ?? '-')}</td>
+          <td>${methodTag}</td>
+        </tr>`
+      } else {
+        groupsHtml += `<tr class="match-row-unmatched">
+          <td>${escapeHtml(courseName)}</td>
+          <td><span class="dim">&mdash;</span></td>
+          <td class="dim">(未修)</td>
+          <td class="dim">-</td>
+          <td class="dim">-</td>
+          <td class="dim">-</td>
+        </tr>`
+      }
+    }
+
+    groupsHtml += `</tbody></table></div>`
   }
 
   let unmetHtml = ''
@@ -401,8 +719,33 @@ function renderResult(result: VerificationResult, mod: Module, student: StudentI
     </div>`
   }
 
+  // Feedback form
+  const existingFeedback = getFeedback(student.student_id, mod.key)
+  let feedbackHtml = `<div class="card">
+    <h2>結果回饋</h2>
+    <p style="color: #666; margin-bottom: 12px; font-size: 0.9rem;">此結果是否正確？您的回饋將協助我們改進系統。</p>`
+
+  if (existingFeedback) {
+    const fbTag = existingFeedback.is_correct
+      ? '<span class="tag tag-pass">正確</span>'
+      : '<span class="tag tag-fail">不正確</span>'
+    feedbackHtml += `<p style="margin-bottom: 12px;">已回饋: ${fbTag}${existingFeedback.comment ? ` — ${escapeHtml(existingFeedback.comment)}` : ''}</p>`
+  }
+
+  feedbackHtml += `<form action="/feedback" method="POST">
+      <input type="hidden" name="student_id" value="${escapeHtml(student.student_id)}">
+      <input type="hidden" name="module_key" value="${escapeHtml(mod.key)}">
+      <div style="margin-bottom: 12px;">
+        <label style="margin-right: 16px;"><input type="radio" name="is_correct" value="yes"${existingFeedback?.is_correct === true ? ' checked' : ''} required> 正確</label>
+        <label><input type="radio" name="is_correct" value="no"${existingFeedback?.is_correct === false ? ' checked' : ''}> 不正確</label>
+      </div>
+      <textarea name="comment" placeholder="補充說明 (選填)" style="margin-bottom: 12px;">${escapeHtml(existingFeedback?.comment ?? '')}</textarea>
+      <button type="submit" class="btn btn-sm">${existingFeedback ? '更新回饋' : '送出回饋'}</button>
+    </form>
+  </div>`
+
   return `
-    <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
       <div>
         <span class="student-name">${escapeHtml(student.name)}</span>
         <span class="tag tag-info">${escapeHtml(student.student_id)}</span>
@@ -435,22 +778,13 @@ function renderResult(result: VerificationResult, mod: Module, student: StudentI
 
     ${unmetHtml}
 
+    ${feedbackHtml}
+
     <div style="text-align: center; margin-top: 20px;">
       <a href="/student?id=${encodeURIComponent(student.student_id)}" class="btn btn-secondary">檢核其他模組</a>
       <a href="/" class="btn btn-secondary" style="margin-left: 8px;">查詢其他學生</a>
     </div>
   `
-}
-
-function ruleDescription(rule: import('./models.ts').SelectionRule): string {
-  switch (rule.type) {
-    case 'required': return '必修'
-    case 'choose_m_from_n': return `${rule.choose_n ?? '?'}選${rule.choose_m ?? '?'}`
-    case 'min_credits': return `至少${rule.min_credits}學分`
-    case 'min_courses': return `至少${rule.min_courses}門`
-    case 'substitute': return '替代'
-    default: return ''
-  }
 }
 
 function escapeHtml(s: string): string {

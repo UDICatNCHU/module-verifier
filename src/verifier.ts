@@ -1,5 +1,5 @@
 import type {
-  Module, StudentCourse, CourseGroup, GroupResult, VerificationResult,
+  Module, StudentCourse, CourseGroup, GroupResult, VerificationResult, CourseMatchDetail,
 } from './models.ts'
 
 /** Normalize course name for matching: trim, collapse spaces, normalize width */
@@ -68,6 +68,24 @@ function findMatch(
   return findAllMatches(lookup, courseCodes, courseName)[0]
 }
 
+/** Find match and report how it was matched (code vs name) */
+function findMatchWithMethod(
+  lookup: StudentLookup,
+  courseCodes: readonly string[] | undefined,
+  courseName: string,
+): { course: StudentCourse; method: 'code' | 'name' } | undefined {
+  if (courseCodes && courseCodes.length > 0) {
+    for (const code of courseCodes) {
+      const byCode = lookup.byCode.get(code)
+      if (byCode && byCode.length > 0) return { course: byCode[0], method: 'code' }
+    }
+  }
+  const key = normalizeName(courseName)
+  const byName = lookup.byName.get(key)
+  if (byName && byName.length > 0) return { course: byName[0], method: 'name' }
+  return undefined
+}
+
 /** Count semester occurrences for a course (for 選修兩學期 requirement) */
 function countSemesters(
   lookup: StudentLookup,
@@ -87,12 +105,14 @@ function verifyGroup(
 ): GroupResult {
   const coursesInGroup = group.courses.map(c => c.name_zh)
   const coursesMatched: string[] = []
+  const matchDetails: CourseMatchDetail[] = []
   let creditsMatched = 0
 
   // Find which courses in this group the student has taken
   for (const course of group.courses) {
-    const match = findMatch(lookup, course.course_codes, course.name_zh)
-    if (match) {
+    const matchResult = findMatchWithMethod(lookup, course.course_codes, course.name_zh)
+    if (matchResult) {
+      const { course: match, method } = matchResult
       // Check for 選修兩學期 — this is a per-COURSE constraint from the original remark,
       // not a group-level one. Check the individual course's remark.
       const courseRequiresTwoSemesters = course.remark?.includes('選修兩學期') ?? false
@@ -101,10 +121,28 @@ function verifyGroup(
         if (semCount >= 2) {
           coursesMatched.push(course.name_zh)
           creditsMatched += match.credits
+          matchDetails.push({
+            module_course_name: course.name_zh,
+            student_course_name: match.name,
+            student_course_code: match.course_code,
+            module_course_codes: course.course_codes,
+            match_method: method,
+            credits: match.credits,
+            semester: match.semester,
+          })
         }
       } else {
         coursesMatched.push(course.name_zh)
         creditsMatched += match.credits
+        matchDetails.push({
+          module_course_name: course.name_zh,
+          student_course_name: match.name,
+          student_course_code: match.course_code,
+          module_course_codes: course.course_codes,
+          match_method: method,
+          credits: match.credits,
+          semester: match.semester,
+        })
       }
     }
   }
@@ -174,6 +212,7 @@ function verifyGroup(
     credits_matched: creditsMatched,
     is_satisfied,
     detail,
+    match_details: matchDetails,
   }
 }
 
@@ -276,14 +315,18 @@ export function verifyModule(
     : module.groups.map(g => verifyGroup(g, lookup))
 
   // Calculate totals from all matched courses (deduplicated by course name)
+  // Use module course lookup for code-aware credit counting — name-only
+  // lookup would miss courses matched via course_code with different names
+  // (e.g. module "專題研究" matched student "專題研究(一)" by code).
+  const moduleCourseByName = new Map(module.all_courses.map(c => [c.name_zh, c]))
   const allMatchedNames = new Set<string>()
   let totalCredits = 0
   for (const gr of groupResults) {
     for (const name of gr.courses_matched) {
       if (!allMatchedNames.has(name)) {
         allMatchedNames.add(name)
-        // Find the actual student credit for this course (name-only lookup for dedup)
-        const match = findMatch(lookup, undefined, name)
+        const mc = moduleCourseByName.get(name)
+        const match = findMatch(lookup, mc?.course_codes, name)
         if (match) totalCredits += match.credits
       }
     }

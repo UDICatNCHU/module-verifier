@@ -9,7 +9,7 @@ const modules = loadModules(DATA_PATH)
 
 describe('module loading', () => {
   it('loads 71 modules', () => {
-    expect(modules.length).toBe(71)
+    expect(modules.length).toBe(73)
   })
 
   it('every module has at least one group', () => {
@@ -198,6 +198,8 @@ describe('verifier - course_code matching', () => {
     const result = verifyModule(mod, student)
     expect(result.is_certified).toBe(true)
     expect(result.total_courses_matched).toBeGreaterThanOrEqual(4)
+    // 6 + 3 + 3 + 2 (專題研究 matched via code) = 14
+    expect(result.total_credits_matched).toBe(14)
   })
 
   it('FAIL: course_code matches but only 1 semester for 選修兩學期', () => {

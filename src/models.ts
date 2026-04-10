@@ -72,6 +72,17 @@ export interface StudentInfo {
   readonly courses: readonly StudentCourse[]
 }
 
+/** Detail of how a single course was matched */
+export interface CourseMatchDetail {
+  readonly module_course_name: string
+  readonly student_course_name: string
+  readonly student_course_code?: string
+  readonly module_course_codes?: readonly string[]
+  readonly match_method: 'code' | 'name'
+  readonly credits: number
+  readonly semester?: string
+}
+
 /** Verification result for a single group */
 export interface GroupResult {
   readonly label: string
@@ -81,6 +92,7 @@ export interface GroupResult {
   readonly credits_matched: number
   readonly is_satisfied: boolean
   readonly detail: string
+  readonly match_details?: readonly CourseMatchDetail[]
 }
 
 /** Overall verification result */
