@@ -261,17 +261,36 @@ function verifyCrossGroupModule(
   const level1Satisfied = satisfiedCategories.size >= 2
   // Create a single Level 1 result
   const allL1Courses = level1Groups.flatMap(g => g.courses)
-  const l1Matched = allL1Courses.filter(c => findMatch(lookup, c.course_codes, c.name_zh))
+  const l1MatchDetails: CourseMatchDetail[] = []
+  const l1MatchedNames: string[] = []
+  let l1Credits = 0
+  for (const c of allL1Courses) {
+    const mr = findMatchWithMethod(lookup, c.course_codes, c.name_zh)
+    if (mr) {
+      l1MatchedNames.push(c.name_zh)
+      l1Credits += mr.course.credits
+      l1MatchDetails.push({
+        module_course_name: c.name_zh,
+        student_course_name: mr.course.name,
+        student_course_code: mr.course.course_code,
+        module_course_codes: c.course_codes,
+        match_method: mr.method,
+        credits: mr.course.credits,
+        semester: mr.course.semester,
+      })
+    }
+  }
   level1Results.push({
     label: `Level 1: 三大類別選2類，每類各選一門`,
     rule: { type: 'choose_m_from_n', choose_m: 2, choose_n: 3, notes: [] },
     courses_in_group: allL1Courses.map(c => c.name_zh),
-    courses_matched: l1Matched.map(c => c.name_zh),
-    credits_matched: l1Matched.reduce((sum, c) => sum + c.credits, 0),
+    courses_matched: l1MatchedNames,
+    credits_matched: l1Credits,
     is_satisfied: level1Satisfied,
     detail: level1Satisfied
       ? `已修 ${satisfiedCategories.size}/2 類別`
       : `已修 ${satisfiedCategories.size}/2 類別 (需再選 ${2 - satisfiedCategories.size} 類別)`,
+    match_details: l1MatchDetails,
   })
 
   // Check Level 2: must correspond to a satisfied Level 1 category
@@ -280,19 +299,38 @@ function verifyCrossGroupModule(
     satisfiedCategories.has(g.rule.subcategory_tag ?? '')
   )
   const l2EligibleCourses = l2Eligible.flatMap(g => g.courses)
-  const l2Matched = l2EligibleCourses.filter(c => findMatch(lookup, c.course_codes, c.name_zh))
-  const level2Satisfied = l2Matched.length >= 1
+  const l2MatchDetails: CourseMatchDetail[] = []
+  const l2MatchedNames: string[] = []
+  let l2Credits = 0
+  for (const c of l2EligibleCourses) {
+    const mr = findMatchWithMethod(lookup, c.course_codes, c.name_zh)
+    if (mr) {
+      l2MatchedNames.push(c.name_zh)
+      l2Credits += mr.course.credits
+      l2MatchDetails.push({
+        module_course_name: c.name_zh,
+        student_course_name: mr.course.name,
+        student_course_code: mr.course.course_code,
+        module_course_codes: c.course_codes,
+        match_method: mr.method,
+        credits: mr.course.credits,
+        semester: mr.course.semester,
+      })
+    }
+  }
+  const level2Satisfied = l2MatchedNames.length >= 1
 
   level1Results.push({
     label: `Level 2: 任選一門 (需對應已修Level 1類別)`,
     rule: { type: 'choose_m_from_n', choose_m: 1, notes: [] },
     courses_in_group: allL2Courses.map(c => c.name_zh),
-    courses_matched: l2Matched.map(c => c.name_zh),
-    credits_matched: l2Matched.reduce((sum, c) => sum + c.credits, 0),
+    courses_matched: l2MatchedNames,
+    credits_matched: l2Credits,
     is_satisfied: level2Satisfied,
     detail: level2Satisfied
       ? `已選 1 門對應課程`
       : `需從已修Level 1類別中選修1門Level 2課程`,
+    match_details: l2MatchDetails,
   })
 
   // Add other groups (like the Level 3 required course)
