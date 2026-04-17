@@ -62,6 +62,7 @@ export interface StudentCourse {
   readonly credits: number
   readonly semester?: string // e.g. "113-1"
   readonly course_code?: string
+  readonly grade?: string // e.g. "85", "P", "Y"
 }
 
 /** Student profile with course records */
