@@ -7,6 +7,9 @@ import { loadModules, getModulesByCollege, findModule } from './module-loader.ts
 import { verifyModule } from './verifier.ts'
 import { fetchStudentInfo, getAllStudents, getStudentsByDepartment, getDepartments } from './student-api.ts'
 import { addFeedback, getFeedback, getAllFeedback, getFeedbackSummary } from './feedback-store.ts'
+import { getModuleOverview } from './module-overview.ts'
+import { renderModuleIndex, renderModuleOverview } from './render-module-overview.ts'
+import { escapeHtml } from './html-utils.ts'
 import type { Module, StudentCourse, StudentInfo, VerificationResult, CourseMatchDetail } from './models.ts'
 
 const DATA_PATH = resolve(import.meta.dirname, '../modules_data.json')
@@ -271,6 +274,7 @@ function layout(title: string, body: string): string {
     <div class="nav-bar">
       <a href="/">首頁</a>
       <a href="/departments">系所總覽</a>
+      <a href="/modules">模組總覽</a>
       <a href="/feedback">回饋總覽</a>
     </div>
     ${body}
@@ -534,6 +538,24 @@ app.get('/department/:name', (c) => {
     ${moduleSelectorHtml}
     ${contentHtml}
   `))
+})
+
+// ─── Module overview ───
+const REAL_DEPT_FILTER = (s: StudentInfo) => s.department !== '【範例資料】'
+
+app.get('/modules', (c) => {
+  return c.html(layout('模組總覽', renderModuleIndex(modulesByCollege)))
+})
+
+app.get('/module/:key', (c) => {
+  const key = c.req.param('key')
+  const mod = findModule(modules, key)
+  if (!mod) {
+    return c.html(layout('找不到模組', '<h1>找不到該領域模組</h1>'), 404)
+  }
+  const realStudents = getAllStudents().filter(REAL_DEPT_FILTER)
+  const overview = getModuleOverview(mod, realStudents)
+  return c.html(layout(`${mod.name_zh} - 模組總覽`, renderModuleOverview(mod, overview)))
 })
 
 // ─── Feedback submission ───
@@ -805,14 +827,6 @@ function renderResult(result: VerificationResult, mod: Module, student: StudentI
       <a href="/" class="btn btn-secondary" style="margin-left: 8px;">查詢其他學生</a>
     </div>
   `
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 // ─── Start server ───
