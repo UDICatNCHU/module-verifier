@@ -9,6 +9,8 @@ import { fetchStudentInfo, getAllStudents, getStudentsByDepartment, getDepartmen
 import { addFeedback, getFeedback, getAllFeedback, getFeedbackSummary } from './feedback-store.ts'
 import { getModuleOverview } from './module-overview.ts'
 import { renderModuleIndex, renderModuleOverview } from './render-module-overview.ts'
+import { getSchoolOverview } from './school-overview.ts'
+import { renderSchoolOverview } from './render-school-overview.ts'
 import { escapeHtml } from './html-utils.ts'
 import type { Module, StudentCourse, StudentInfo, VerificationResult, CourseMatchDetail } from './models.ts'
 
@@ -273,6 +275,7 @@ function layout(title: string, body: string): string {
   <div class="container">
     <div class="nav-bar">
       <a href="/">首頁</a>
+      <a href="/overview">全校總覽</a>
       <a href="/departments">系所總覽</a>
       <a href="/modules">模組總覽</a>
       <a href="/feedback">回饋總覽</a>
@@ -542,6 +545,12 @@ app.get('/department/:name', (c) => {
 
 // ─── Module overview ───
 const REAL_DEPT_FILTER = (s: StudentInfo) => s.department !== '【範例資料】'
+
+app.get('/overview', (c) => {
+  const realStudents = getAllStudents().filter(REAL_DEPT_FILTER)
+  const overview = getSchoolOverview(modules, realStudents)
+  return c.html(layout('全校數據總覽', renderSchoolOverview(overview)))
+})
 
 app.get('/modules', (c) => {
   return c.html(layout('模組總覽', renderModuleIndex(modulesByCollege)))
