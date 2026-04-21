@@ -4,13 +4,16 @@ import type { StudentInfo, StudentCourse } from './models.ts'
 
 /**
  * Dummy student records for development/testing.
- * Kept as fallback so existing test URLs still work.
+ * All dummy records live in the 【範例資料】 department with "[範例]" name
+ * prefix so they are never mixed with real student data in the UI.
  */
+const DUMMY_DEPT = '【範例資料】'
+
 const DUMMY_STUDENTS: readonly StudentInfo[] = [
   {
     student_id: 'D1234001',
-    name: '王小明',
-    department: '歷史學系',
+    name: '[範例] 王小明',
+    department: DUMMY_DEPT,
     courses: [
       { name: '臺灣史', credits: 4, semester: '113-1' },
       { name: '中臺灣區域史', credits: 2, semester: '113-2' },
@@ -23,8 +26,8 @@ const DUMMY_STUDENTS: readonly StudentInfo[] = [
   },
   {
     student_id: 'D1234002',
-    name: '李美玲',
-    department: '會計學系',
+    name: '[範例] 李美玲',
+    department: DUMMY_DEPT,
     courses: [
       { name: '中級會計學(一)', credits: 3, semester: '113-1' },
       { name: '中級會計學(二)', credits: 3, semester: '113-2' },
@@ -38,8 +41,8 @@ const DUMMY_STUDENTS: readonly StudentInfo[] = [
   },
   {
     student_id: 'D1234003',
-    name: '張志豪',
-    department: '資訊管理學系',
+    name: '[範例] 張志豪',
+    department: DUMMY_DEPT,
     courses: [
       { name: '計算機概論', credits: 3, semester: '113-1' },
       { name: '管理數學', credits: 3, semester: '113-1' },
@@ -52,8 +55,8 @@ const DUMMY_STUDENTS: readonly StudentInfo[] = [
   },
   {
     student_id: 'D1234004',
-    name: '陳怡君',
-    department: '會計學系',
+    name: '[範例] 陳怡君',
+    department: DUMMY_DEPT,
     courses: [
       { name: '中級會計學(一)', credits: 3, semester: '113-1' },
       { name: '中級會計學(二)', credits: 3, semester: '113-2' },
@@ -78,8 +81,8 @@ function isPassingGrade(grade: string): boolean {
   return !isNaN(n) && n >= 60
 }
 
-// ─── Load real student data from 4dept Excel ───
-const EXCEL_PATH = resolve(import.meta.dirname, '../20260410-4dept.xlsx')
+// ─── Load real student data from Excel ───
+const EXCEL_PATH = resolve(import.meta.dirname, '../20260420.xlsx')
 const STUDENT_MAP = new Map<string, StudentInfo>()
 
 // Load 4dept Excel if available
@@ -118,7 +121,7 @@ if (existsSync(EXCEL_PATH)) {
       courses: data.courses,
     })
   }
-  console.log(`Loaded ${STUDENT_MAP.size} students from 4dept Excel (${totalRecords} records, ${filteredOut} filtered out: failed/incomplete/ungraded)`)
+  console.log(`Loaded ${STUDENT_MAP.size} students from Excel (${totalRecords} records, ${filteredOut} filtered out: failed/incomplete/ungraded)`)
 }
 
 // Merge dummy students (don't overwrite real data)
