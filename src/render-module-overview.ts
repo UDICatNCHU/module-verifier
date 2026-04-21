@@ -9,7 +9,7 @@ export function renderModuleIndex(
 ): string {
   let html = `
     <h1>模組總覽</h1>
-    <p class="subtitle">選擇領域模組查看目前通過取得認證的學生</p>
+    <p class="subtitle">選擇領域模組查看目前已取得認證的學生</p>
   `
 
   for (const [college, mods] of modulesByCollege) {
@@ -53,7 +53,7 @@ export function renderModuleOverview(mod: Module, overview: ModuleOverview): str
     <div class="stat-row">
       <div class="stat-item">
         <div class="stat-value" style="color:#27ae60;">${overview.passed.length}</div>
-        <div class="stat-label">通過人數</div>
+        <div class="stat-label">取得人數</div>
       </div>
       <div class="stat-item">
         <div class="stat-value">${passDeptCount}</div>
@@ -61,7 +61,7 @@ export function renderModuleOverview(mod: Module, overview: ModuleOverview): str
       </div>
       <div class="stat-item">
         <div class="stat-value" style="color:#e67e22;">${overview.nearMiss.length}</div>
-        <div class="stat-label">近未通過</div>
+        <div class="stat-label">接近取得</div>
       </div>
     </div>
 
@@ -75,10 +75,10 @@ function renderPassSection(
   passGroups: ReadonlyMap<string, readonly StudentPassEntry[]>,
 ): string {
   if (passGroups.size === 0) {
-    return `<div class="card"><h2>通過學生</h2><p style="color:#888;">目前尚無學生通過此模組認證</p></div>`
+    return `<div class="card"><h2>取得學生</h2><p style="color:#888;">目前尚無學生取得此模組認證</p></div>`
   }
 
-  let html = `<div class="card"><h2>通過學生 (按系所分組)</h2>`
+  let html = `<div class="card"><h2>取得學生 (按系所分組)</h2>`
   const sorted = [...passGroups.entries()].sort((a, b) => b[1].length - a[1].length)
   for (const [dept, entries] of sorted) {
     html += `<div class="college-name">${escapeHtml(dept)} — ${entries.length} 人</div>`
@@ -96,7 +96,7 @@ function renderNearMissSection(
     return ''
   }
 
-  let html = `<div class="card"><h2>近未通過學生 (差 1 門 + 3 學分內)</h2>`
+  let html = `<div class="card"><h2>接近取得的學生 (差 1 門 + 3 學分內)</h2>`
   const sorted = [...nearGroups.entries()].sort((a, b) => b[1].length - a[1].length)
   for (const [dept, entries] of sorted) {
     html += `<div class="college-name">${escapeHtml(dept)} — ${entries.length} 人</div>`
