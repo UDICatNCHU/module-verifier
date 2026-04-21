@@ -13,7 +13,13 @@ const FEEDBACK_PATH = resolve(import.meta.dirname, '../feedback.json')
 
 function loadAll(): FeedbackEntry[] {
   if (!existsSync(FEEDBACK_PATH)) return []
-  return JSON.parse(readFileSync(FEEDBACK_PATH, 'utf-8')) as FeedbackEntry[]
+  try {
+    const parsed = JSON.parse(readFileSync(FEEDBACK_PATH, 'utf-8'))
+    return Array.isArray(parsed) ? parsed as FeedbackEntry[] : []
+  } catch (err) {
+    console.error(`feedback.json 解析失敗,回傳空陣列:`, err)
+    return []
+  }
 }
 
 function saveAll(entries: readonly FeedbackEntry[]): void {

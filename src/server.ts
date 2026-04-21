@@ -366,8 +366,8 @@ app.get('/student', async (c) => {
 
 // ─── Page 3: Auto-verification result ───
 app.get('/student/:studentId/verify/:moduleKey', async (c) => {
-  const studentId = decodeURIComponent(c.req.param('studentId'))
-  const moduleKey = decodeURIComponent(c.req.param('moduleKey'))
+  const studentId = c.req.param('studentId')
+  const moduleKey = c.req.param('moduleKey')
 
   const student = await fetchStudentInfo(studentId)
   if (!student) {
@@ -413,7 +413,7 @@ app.get('/departments', (c) => {
 
 // ─── Department detail + batch verify ───
 app.get('/department/:name', (c) => {
-  const deptName = decodeURIComponent(c.req.param('name'))
+  const deptName = c.req.param('name')
   const students = getStudentsByDepartment(deptName)
   const selectedModule = c.req.query('module')
 
@@ -522,7 +522,7 @@ app.post('/feedback', async (c) => {
   const studentId = String(body['student_id'] ?? '')
   const moduleKey = String(body['module_key'] ?? '')
   const isCorrect = body['is_correct'] === 'yes'
-  const comment = String(body['comment'] ?? '').trim()
+  const comment = String(body['comment'] ?? '').trim().slice(0, 2000)
 
   if (studentId && moduleKey) {
     addFeedback({
@@ -614,7 +614,7 @@ app.get('/api/student/:id', async (c) => {
 })
 
 app.post('/api/verify/:key', async (c) => {
-  const key = decodeURIComponent(c.req.param('key'))
+  const key = c.req.param('key')
   const mod = findModule(modules, key)
   if (!mod) return c.json({ error: '找不到該領域模組' }, 404)
 
@@ -636,7 +636,7 @@ app.get('/api/modules', (c) => {
 })
 
 app.get('/api/modules/:key', (c) => {
-  const key = decodeURIComponent(c.req.param('key'))
+  const key = c.req.param('key')
   const mod = findModule(modules, key)
   if (!mod) return c.json({ error: '找不到該領域模組' }, 404)
   return c.json(mod)
