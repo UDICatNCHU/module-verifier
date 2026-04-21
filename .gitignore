@@ -4,6 +4,7 @@ dist/
 .claude/plans/
 scripts/output/
 feedback.json
+coverage/
 
 # Student record Excel files — contain 個資, never commit
 20260420.xlsx

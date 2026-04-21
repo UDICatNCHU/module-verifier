@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { parseRequirementValue, parseCertificationRequirement } from '../src/requirement-parser.ts'
 
+describe('parseRequirementValue edge cases', () => {
+  it('throws on unparseable input with the raw string in the message', () => {
+    expect(() => parseRequirementValue('no digits anywhere')).toThrow(/no digits anywhere/)
+  })
+
+  it('throws on empty string', () => {
+    expect(() => parseRequirementValue('')).toThrow()
+  })
+})
+
 describe('parseRequirementValue', () => {
   // Integer values
   it('handles integer input', () => {

@@ -28,7 +28,7 @@ if (authUsers.length === 0) {
   console.warn('⚠️  auth.json 不存在或為空,伺服器將在無認證下執行')
 }
 
-const app = new Hono()
+export const app = new Hono()
 
 if (authUsers.length > 0) {
   app.use('*', basicAuth({
@@ -838,8 +838,10 @@ function renderResult(result: VerificationResult, mod: Module, student: StudentI
   `
 }
 
-// ─── Start server ───
-const PORT = 3456
-console.log(`Server running at http://localhost:${PORT}`)
-console.log(`Loaded ${modules.length} modules`)
-serve({ fetch: app.fetch, port: PORT })
+// ─── Start server (skipped during vitest imports so tests can use app.request) ───
+if (!process.env.VITEST) {
+  const PORT = 3456
+  console.log(`Server running at http://localhost:${PORT}`)
+  console.log(`Loaded ${modules.length} modules`)
+  serve({ fetch: app.fetch, port: PORT })
+}
