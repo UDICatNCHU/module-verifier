@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
+import { basicAuth } from 'hono/basic-auth'
 import { serve } from '@hono/node-server'
 import { resolve } from 'node:path'
+import { readFileSync, existsSync } from 'node:fs'
 import { loadModules, getModulesByCollege, findModule } from './module-loader.ts'
 import { verifyModule } from './verifier.ts'
 import { fetchStudentInfo, getAllStudents, getStudentsByDepartment, getDepartments } from './student-api.ts'
@@ -11,7 +13,25 @@ const DATA_PATH = resolve(import.meta.dirname, '../modules_data.json')
 const modules = loadModules(DATA_PATH)
 const modulesByCollege = getModulesByCollege(modules)
 
+// ─── Basic Auth ───
+interface AuthUser { readonly username: string; readonly password: string }
+const AUTH_PATH = resolve(import.meta.dirname, '../auth.json')
+const authUsers: readonly AuthUser[] = existsSync(AUTH_PATH)
+  ? JSON.parse(readFileSync(AUTH_PATH, 'utf-8')) as AuthUser[]
+  : []
+if (authUsers.length === 0) {
+  console.warn('⚠️  auth.json 不存在或為空,伺服器將在無認證下執行')
+}
+
 const app = new Hono()
+
+if (authUsers.length > 0) {
+  app.use('*', basicAuth({
+    verifyUser: (username, password) =>
+      authUsers.some(u => u.username === username && u.password === password),
+    realm: 'NCHU Module Verifier',
+  }))
+}
 
 // ─── Shared HTML layout ───
 function layout(title: string, body: string): string {
