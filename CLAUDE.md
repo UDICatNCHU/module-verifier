@@ -87,7 +87,7 @@ modules_data.json
 Three hardest module categories identified (2026-04-07):
 
 1. **生科系 (動物生理、微生物科技、植物生理)** — 「專題研究」有多個科目內碼、全學年但不指定學期 → **已處理**: multi-code `course_codes[]` matching + `countSemesters()`
-2. **企管系** — 各層級至少 1 門 + 合計至少 4 門（唯一此設計的模組） → **待處理**: 資料尚未進入 `modules_data.json`，且目前架構無此驗證模式，需新增 per-tier minimum + global total 規則
+2. **企管系 商業智慧** — 各層級至少 1 門 + 合計至少 4 門 → **已處理**: 由現有 `required` + `choose_m_from_n` group 各自滿足（各 tier ≥1 門）結合 `certification.min_courses` 全域檢查（合計 ≥4 門）達成，不需特殊規則
 3. **台文學士 影像與視覺文化** — 各層級選修間具對應關係（唯一此設計） → **已處理**: `verifyCrossGroupModule()`
 
 ## Verified results (2026-04-10)
@@ -99,6 +99,5 @@ Three hardest module categories identified (2026-04-07):
 
 ## Pending work
 
-- **企管系模組**: 等資料加入後，需在 `verifier.ts` 新增「各 tier ≥1 門 + 合計 ≥N 門」驗證邏輯
 - **真實 API 串接**: 替換 `src/student-api.ts` 的 `fetchStudentInfo()` 為真實學生成績 API，確認回傳的 `course_code` 欄位格式
 - **19 門課程代碼未解決**: 歷史系、行銷系、植病系、物理系、環工系、化工系、電機系、森林系、應經系的同名課程內碼不確定，不影響 4 系所測試

@@ -30,7 +30,7 @@ const deptModuleMap: Record<string, readonly string[]> = {
     '生命科學系_植物生理',
   ],
   '資工系': ['資管系_資訊管理領域模組'],
-  '企管系': [], // 模組尚未建立
+  '企管系': ['企業管理學系_商業智慧'],
 }
 
 const moduleKeys = deptModuleMap[targetDept]
