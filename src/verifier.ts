@@ -98,6 +98,29 @@ function countSemesters(
   return semesters.size
 }
 
+/**
+ * Sum credits across all student records that match a module course — used
+ * for 選修兩學期 courses where each semester's credits must be counted.
+ * De-duplicates by (student_course_code, semester) so the same record
+ * appearing in both byCode and byName lookups isn't double-counted.
+ */
+function sumAllCredits(
+  lookup: StudentLookup,
+  courseCodes: readonly string[] | undefined,
+  courseName: string,
+): number {
+  const matches = findAllMatches(lookup, courseCodes, courseName)
+  const seen = new Set<string>()
+  let total = 0
+  for (const m of matches) {
+    const key = `${m.course_code ?? m.name}|${m.semester ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    total += m.credits
+  }
+  return total
+}
+
 /** Verify a single course group */
 function verifyGroup(
   group: CourseGroup,
@@ -120,14 +143,16 @@ function verifyGroup(
         const semCount = countSemesters(lookup, course.course_codes, course.name_zh)
         if (semCount >= 2) {
           coursesMatched.push(course.name_zh)
-          creditsMatched += match.credits
+          // Sum all semesters' credits, not just the first match — otherwise
+          // a 2-semester course ends up counted as a single semester.
+          creditsMatched += sumAllCredits(lookup, course.course_codes, course.name_zh)
           matchDetails.push({
             module_course_name: course.name_zh,
             student_course_name: match.name,
             student_course_code: match.course_code,
             module_course_codes: course.course_codes,
             match_method: method,
-            credits: match.credits,
+            credits: sumAllCredits(lookup, course.course_codes, course.name_zh),
             semester: match.semester,
           })
         }
@@ -364,8 +389,15 @@ export function verifyModule(
       if (!allMatchedNames.has(name)) {
         allMatchedNames.add(name)
         const mc = moduleCourseByName.get(name)
-        const match = findMatch(lookup, mc?.course_codes, name)
-        if (match) totalCredits += match.credits
+        // 選修兩學期 courses must sum credits across semesters;
+        // regular courses only count the first match (repeats don't stack).
+        const twoSem = mc?.remark?.includes('選修兩學期') ?? false
+        if (twoSem) {
+          totalCredits += sumAllCredits(lookup, mc?.course_codes, name)
+        } else {
+          const match = findMatch(lookup, mc?.course_codes, name)
+          if (match) totalCredits += match.credits
+        }
       }
     }
   }

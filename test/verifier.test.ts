@@ -198,8 +198,8 @@ describe('verifier - course_code matching', () => {
     const result = verifyModule(mod, student)
     expect(result.is_certified).toBe(true)
     expect(result.total_courses_matched).toBeGreaterThanOrEqual(4)
-    // 6 + 3 + 3 + 2 (專題研究 matched via code) = 14
-    expect(result.total_credits_matched).toBe(14)
+    // 選修兩學期 credits sum across both semesters: 6 + 3 + 3 + (2 + 2) = 16
+    expect(result.total_credits_matched).toBe(16)
   })
 
   it('FAIL: course_code matches but only 1 semester for 選修兩學期', () => {
@@ -289,6 +289,27 @@ describe('verifier - multi-code matching (上下學期不同碼)', () => {
     // 專題研究兩學期都被匹配到（透過多碼），滿足選修兩學期
     expect(appGroup!.courses_matched).toContain('專題研究')
     expect(result.is_certified).toBe(true)
+  })
+
+  it('bug #2 regression: 選修兩學期 credits sum across semesters', () => {
+    // Student takes 專題研究 two semesters at 1 credit each → should count as 2
+    // credits (not 1). Regression guard for the bug where only the first
+    // match's credits were added to the running total.
+    const student: StudentCourse[] = [
+      { name: '生物化學', credits: 6, semester: '112-1' },
+      { name: '植物生理學', credits: 3, semester: '114-1' },
+      { name: '植物組織培養及實驗', credits: 3, semester: '112-1' },
+      { name: '專題研究', credits: 1, semester: '112-1', course_code: '02603' },
+      { name: '專題研究', credits: 1, semester: '112-2', course_code: '99501' },
+    ]
+    const result = verifyModule(mod, student)
+    // 6 (生物化學) + 3 (植物生理學) + 3 (植物組織培養) + (1 + 1) 專題研究 = 14
+    expect(result.total_credits_matched).toBe(14)
+    // The group credit for 應用課程: 3 (植物組織培養) + (1 + 1) 專題研究 = 5
+    const appGroup = result.group_results.find(g =>
+      g.rule.type === 'choose_m_from_n' && g.rule.category === '應用課程'
+    )
+    expect(appGroup!.credits_matched).toBe(5)
   })
 
   it('FAIL: ��有上學期碼，選修兩學期未滿足', () => {
