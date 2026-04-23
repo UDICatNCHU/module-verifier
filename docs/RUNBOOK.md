@@ -42,10 +42,30 @@ curl -s -o /dev/null -w 'HTTP %{http_code}\n' -u "staff:$PASS" https://cert.nlpn
 
 | 資料 | 動作 |
 |------|------|
-| **新學年成績** | 新 xlsx 覆蓋 `20260420.xlsx`,tsx watch 會重載;用 `touch src/student-api.ts` 強制觸發 |
-| **模組定義異動** | 編輯 `modules_data.json`(或透過 `scripts/import-course-codes.ts --apply`) |
-| **新增/移除職員帳號** | 編輯 `auth.json`,**必須 `touch src/server.ts` 觸發重載**(auth.json 沒在 tsx watch 路徑內) |
+| **新學年成績** | 新 xlsx 覆蓋 `20260420.xlsx`,**必須 `touch src/server.ts`** 才會重載(modules_data.json / xlsx 不在 tsx watch 路徑內) |
+| **模組定義異動** | 編輯 `modules_data.json`(或透過 `scripts/import-course-codes.ts --apply`),同樣要 `touch src/server.ts` |
+| **新增/移除職員帳號** | 編輯 `auth.json`,同樣要 `touch src/server.ts` |
 | **密碼輪替** | 更新 `auth.json` 後同上 |
+
+### 全年課資料修正(常見 workflow)
+
+職員回報「某系學生修了兩學期的 X 課,系統只算一學期學分」時,依校方回覆處理:
+
+| 校方語意 | 資料動作 | 驗證邏輯 |
+|---------|---------|---------|
+| **全年合計,學生兩學期都要修** | 加/拼接備註:`"備註": "... 選修兩學期"` | `sumAllCredits` 會加總兩學期學分 |
+| **全年課但只認某一學期** | 加結構化欄位:`"認列學期": "上"` 或 `"下"` | `filterBySemester` 僅匹配該學期紀錄 |
+| **實際是單學期,模組學分為誤值** | 修正 `規劃要點["5"]` 的學分數 | 無需改程式 |
+
+改完後 `touch src/server.ts` 觸發 reload,上線驗證:
+
+```bash
+PASS=$(jq -r '.[0].password' auth.json)
+# 先訪問 /overview 比對修改前後的 「可發認證總數」
+curl -s -u "staff:$PASS" https://cert.nlpnchu.org/overview | grep -oE 'stat-value[^>]*>[0-9]+' | head -1
+```
+
+歷史上已處理的案例:經濟學原理(應經 3 模組 +18 人)、普通物理學(物理/機械 3 模組只認下學期 0 翻盤)、動物解剖生理學(動科 2 模組 +54 人)、材料科學導論(+42 人)、生物化學(4 模組 +36 人)。
 
 ## 監控
 

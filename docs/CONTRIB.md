@@ -97,7 +97,7 @@ npx vitest run --coverage         # 含覆蓋率
 
 ```
 src/
-  server.ts                       Hono app + routes + layout (~845 行)
+  server.ts                       Hono app + routes + layout (~847 行)
   models.ts                       所有 TypeScript interfaces
   verifier.ts                     核心驗證引擎
   remark-parser.ts                79 種「備註」pattern 解析
@@ -112,7 +112,7 @@ src/
   render-school-overview.ts       /overview 的 HTML
   html-utils.ts                   escapeHtml
 
-test/                             9 個測試檔,191 tests
+test/                             9 個測試檔,208 tests(覆蓋率 97%)
 scripts/                          CLI 工具(import-course-codes、verify-4dept)
 docs/                             本目錄
 ```
