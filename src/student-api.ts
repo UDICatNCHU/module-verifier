@@ -2,71 +2,6 @@ import { resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import type { StudentInfo, StudentCourse } from './models.ts'
 
-/**
- * Dummy student records for development/testing.
- * All dummy records live in the 【範例資料】 department with "[範例]" name
- * prefix so they are never mixed with real student data in the UI.
- */
-const DUMMY_DEPT = '【範例資料】'
-
-const DUMMY_STUDENTS: readonly StudentInfo[] = [
-  {
-    student_id: 'D1234001',
-    name: '[範例] 王小明',
-    department: DUMMY_DEPT,
-    courses: [
-      { name: '臺灣史', credits: 4, semester: '113-1' },
-      { name: '中臺灣區域史', credits: 2, semester: '113-2' },
-      { name: '戰後中臺灣旅遊觀光史(1945-2010)', credits: 2, semester: '114-1' },
-      { name: '臺中學', credits: 2, semester: '114-1' },
-      { name: '日治時期臺灣山區探險史', credits: 2, semester: '114-2' },
-      { name: '中國通史', credits: 4, semester: '113-1' },
-      { name: '西洋史', credits: 3, semester: '113-2' },
-    ],
-  },
-  {
-    student_id: 'D1234002',
-    name: '[範例] 李美玲',
-    department: DUMMY_DEPT,
-    courses: [
-      { name: '中級會計學(一)', credits: 3, semester: '113-1' },
-      { name: '中級會計學(二)', credits: 3, semester: '113-2' },
-      { name: '成本與管理會計學', credits: 6, semester: '114-1' },
-      { name: '審計學', credits: 6, semester: '114-1' },
-      { name: '會計資訊系統', credits: 3, semester: '114-2' },
-      { name: '經濟學原理', credits: 3, semester: '113-1' },
-      { name: '統計學', credits: 3, semester: '113-2' },
-      { name: '管理學', credits: 3, semester: '113-1' },
-    ],
-  },
-  {
-    student_id: 'D1234003',
-    name: '[範例] 張志豪',
-    department: DUMMY_DEPT,
-    courses: [
-      { name: '計算機概論', credits: 3, semester: '113-1' },
-      { name: '管理數學', credits: 3, semester: '113-1' },
-      { name: '資訊管理導論', credits: 3, semester: '113-2' },
-      { name: '機器學習', credits: 3, semester: '114-1' },
-      { name: '程式設計', credits: 3, semester: '113-1' },
-      { name: '資料結構', credits: 3, semester: '113-2' },
-      { name: '資料庫管理', credits: 3, semester: '114-1' },
-    ],
-  },
-  {
-    student_id: 'D1234004',
-    name: '[範例] 陳怡君',
-    department: DUMMY_DEPT,
-    courses: [
-      { name: '中級會計學(一)', credits: 3, semester: '113-1' },
-      { name: '中級會計學(二)', credits: 3, semester: '113-2' },
-      { name: '成本與管理會計學', credits: 6, semester: '114-1' },
-      { name: '會計學原理', credits: 3, semester: '113-1' },
-      { name: '統計學', credits: 3, semester: '113-2' },
-    ],
-  },
-]
-
 // ─── Grade filtering ───
 
 /**
@@ -122,13 +57,6 @@ if (existsSync(EXCEL_PATH)) {
     })
   }
   console.log(`Loaded ${STUDENT_MAP.size} students from Excel (${totalRecords} records, ${filteredOut} filtered out: failed/incomplete/ungraded)`)
-}
-
-// Merge dummy students (don't overwrite real data)
-for (const dummy of DUMMY_STUDENTS) {
-  if (!STUDENT_MAP.has(dummy.student_id)) {
-    STUDENT_MAP.set(dummy.student_id, dummy)
-  }
 }
 
 /**

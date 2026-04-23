@@ -544,11 +544,9 @@ app.get('/department/:name', (c) => {
 })
 
 // ─── Module overview ───
-const REAL_DEPT_FILTER = (s: StudentInfo) => s.department !== '【範例資料】'
 
 app.get('/overview', (c) => {
-  const realStudents = getAllStudents().filter(REAL_DEPT_FILTER)
-  const overview = getSchoolOverview(modules, realStudents)
+  const overview = getSchoolOverview(modules, getAllStudents())
   return c.html(layout('全校數據總覽', renderSchoolOverview(overview)))
 })
 
@@ -562,8 +560,7 @@ app.get('/module/:key', (c) => {
   if (!mod) {
     return c.html(layout('找不到模組', '<h1>找不到該領域模組</h1>'), 404)
   }
-  const realStudents = getAllStudents().filter(REAL_DEPT_FILTER)
-  const overview = getModuleOverview(mod, realStudents)
+  const overview = getModuleOverview(mod, getAllStudents())
   return c.html(layout(`${mod.name_zh} - 模組總覽`, renderModuleOverview(mod, overview)))
 })
 

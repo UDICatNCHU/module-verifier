@@ -137,12 +137,13 @@ describe('server — JSON APIs', () => {
     expect(body.is_certified).toBe(true)
   })
 
-  it('GET /api/student/:id returns dummy student data', async () => {
-    const res = await get('/api/student/D1234001')
+  it('GET /api/student/:id returns real student data (requires 20260420.xlsx)', async () => {
+    // 4110010003 is a 台文學士 student (黃宜婷) known from the sampling report.
+    const res = await get('/api/student/4110010003')
     expect(res.status).toBe(200)
-    const body = await res.json() as { student_id: string; name: string }
-    expect(body.student_id).toBe('D1234001')
-    expect(body.name).toContain('範例')
+    const body = await res.json() as { student_id: string; name: string; department: string }
+    expect(body.student_id).toBe('4110010003')
+    expect(body.department).toBe('台文學士')
   })
 
   it('GET /api/student/:id returns 404 for unknown id', async () => {
@@ -158,20 +159,22 @@ describe('server — student + feedback flow', () => {
     expect(res.headers.get('location')).toContain('error=')
   })
 
-  it('/student?id=... renders a dummy student page with modules to pick', async () => {
-    const res = await get('/student?id=D1234001')
+  it('/student?id=... renders a real student page with modules to pick', async () => {
+    const res = await get('/student?id=4110010003')
     expect(res.status).toBe(200)
     const body = await res.text()
-    expect(body).toContain('[範例] 王小明')
+    expect(body).toContain('4110010003')
     expect(body).toContain('選擇要檢核的領域模組')
   })
 
   it('/student/:id/verify/:key renders full verification result', async () => {
-    const key = encodeURIComponent('企業管理學系_商業智慧')
-    const res = await get(`/student/D1234001/verify/${key}`)
+    // 黃宜婷 passes 影像與視覺文化 per sampling report — covers the PASS
+    // render path with match_details populated.
+    const key = encodeURIComponent('台灣人文創新學士學位學程_影像與視覺文化')
+    const res = await get(`/student/4110010003/verify/${key}`)
     expect(res.status).toBe(200)
     const body = await res.text()
-    expect(body).toContain('商業智慧')
+    expect(body).toContain('影像與視覺文化')
     expect(body).toContain('分組檢核')
   })
 
@@ -184,7 +187,7 @@ describe('server — student + feedback flow', () => {
   })
 
   it('/student/:id/verify/:key returns 404 when the module key is unknown', async () => {
-    const res = await get('/student/D1234001/verify/nonexistent')
+    const res = await get('/student/4110010003/verify/nonexistent')
     expect(res.status).toBe(404)
     const body = await res.text()
     expect(body).toContain('找不到該領域模組')
@@ -199,8 +202,8 @@ describe('server — student + feedback flow', () => {
 })
 
 describe('server — feedback endpoints', () => {
-  const SID = 'D1234002' // dummy 李美玲
-  const MODKEY = '企業管理學系_商業智慧'
+  const SID = '4110010003' // 黃宜婷, 台文學士
+  const MODKEY = '台灣人文創新學士學位學程_影像與視覺文化'
 
   it('POST /feedback persists and redirects back with ?feedback=saved', async () => {
     const form = new URLSearchParams({
@@ -269,10 +272,10 @@ describe('server — feedback endpoints', () => {
 
 describe('server — department pages', () => {
   it('/department/:name renders student list for known dept', async () => {
-    const res = await get('/department/' + encodeURIComponent('【範例資料】'))
+    const res = await get('/department/' + encodeURIComponent('台文學士'))
     expect(res.status).toBe(200)
     const body = await res.text()
-    expect(body).toContain('【範例資料】')
+    expect(body).toContain('台文學士')
     expect(body).toContain('選擇模組進行批次驗證')
   })
 
@@ -282,17 +285,17 @@ describe('server — department pages', () => {
   })
 
   it('/department/:name?module=X runs batch verify', async () => {
-    const modKey = encodeURIComponent('企業管理學系_商業智慧')
-    const res = await get(`/department/${encodeURIComponent('【範例資料】')}?module=${modKey}`)
+    const modKey = encodeURIComponent('台灣人文創新學士學位學程_影像與視覺文化')
+    const res = await get(`/department/${encodeURIComponent('台文學士')}?module=${modKey}`)
     expect(res.status).toBe(200)
     const body = await res.text()
-    expect(body).toContain('商業智慧')
+    expect(body).toContain('影像與視覺文化')
     // Pass/fail tags should appear for each student in the batch
     expect(body).toMatch(/tag-(pass|fail)/)
   })
 
   it('/department/:name?module=unknown shows error card', async () => {
-    const res = await get(`/department/${encodeURIComponent('【範例資料】')}?module=bogus`)
+    const res = await get(`/department/${encodeURIComponent('台文學士')}?module=bogus`)
     expect(res.status).toBe(200)
     const body = await res.text()
     expect(body).toContain('找不到該模組')

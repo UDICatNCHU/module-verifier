@@ -14,7 +14,7 @@ export function renderSchoolOverview(overview: SchoolOverview): string {
 
   return `
     <h1>全校數據總覽</h1>
-    <p class="subtitle">依現有學生修課紀錄計算,以全體真實學生為母體(排除範例資料)</p>
+    <p class="subtitle">依現有學生修課紀錄計算,以全體真實學生為母體</p>
 
     <div class="stat-row">
       <div class="stat-item">
