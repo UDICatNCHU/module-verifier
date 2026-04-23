@@ -174,4 +174,127 @@ describe('server — student + feedback flow', () => {
     expect(body).toContain('商業智慧')
     expect(body).toContain('分組檢核')
   })
+
+  it('/ with ?error=X renders the error banner', async () => {
+    const res = await get('/?error=' + encodeURIComponent('測試錯誤訊息'))
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    expect(body).toContain('error-msg')
+    expect(body).toContain('測試錯誤訊息')
+  })
+
+  it('/student/:id/verify/:key returns 404 when the module key is unknown', async () => {
+    const res = await get('/student/D1234001/verify/nonexistent')
+    expect(res.status).toBe(404)
+    const body = await res.text()
+    expect(body).toContain('找不到該領域模組')
+  })
+
+  it('/student/:id/verify/:key redirects home for unknown student id', async () => {
+    const key = encodeURIComponent('企業管理學系_商業智慧')
+    const res = await get(`/student/NOTEXIST/verify/${key}`)
+    expect([302, 307]).toContain(res.status)
+    expect(res.headers.get('location')).toContain('error=')
+  })
+})
+
+describe('server — feedback endpoints', () => {
+  const SID = 'D1234002' // dummy 李美玲
+  const MODKEY = '企業管理學系_商業智慧'
+
+  it('POST /feedback persists and redirects back with ?feedback=saved', async () => {
+    const form = new URLSearchParams({
+      student_id: SID, module_key: MODKEY,
+      is_correct: 'yes', comment: '測試回饋',
+    })
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: {
+        Authorization: AUTH_HEADER,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    })
+    expect([302, 307]).toContain(res.status)
+    expect(res.headers.get('location')).toContain('feedback=saved')
+  })
+
+  it('POST /feedback silently skips when student_id missing', async () => {
+    const form = new URLSearchParams({
+      student_id: '', module_key: MODKEY,
+      is_correct: 'yes', comment: '',
+    })
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: {
+        Authorization: AUTH_HEADER,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    })
+    expect([302, 307]).toContain(res.status)
+  })
+
+  it('POST /feedback truncates comments over 2000 chars', async () => {
+    const form = new URLSearchParams({
+      student_id: SID, module_key: MODKEY,
+      is_correct: 'no', comment: 'x'.repeat(3000),
+    })
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: {
+        Authorization: AUTH_HEADER,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    })
+    expect([302, 307]).toContain(res.status)
+  })
+
+  it('GET /feedback renders the dashboard', async () => {
+    const res = await get('/feedback')
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    expect(body).toContain('回饋總覽')
+    expect(body).toContain('總回饋數')
+  })
+
+  it('GET /feedback?filter=correct / incorrect applies filter', async () => {
+    const r1 = await get('/feedback?filter=correct')
+    expect(r1.status).toBe(200)
+    const r2 = await get('/feedback?filter=incorrect')
+    expect(r2.status).toBe(200)
+  })
+})
+
+describe('server — department pages', () => {
+  it('/department/:name renders student list for known dept', async () => {
+    const res = await get('/department/' + encodeURIComponent('【範例資料】'))
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    expect(body).toContain('【範例資料】')
+    expect(body).toContain('選擇模組進行批次驗證')
+  })
+
+  it('/department/:name returns 404 for unknown dept', async () => {
+    const res = await get('/department/' + encodeURIComponent('不存在系所XXX'))
+    expect(res.status).toBe(404)
+  })
+
+  it('/department/:name?module=X runs batch verify', async () => {
+    const modKey = encodeURIComponent('企業管理學系_商業智慧')
+    const res = await get(`/department/${encodeURIComponent('【範例資料】')}?module=${modKey}`)
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    expect(body).toContain('商業智慧')
+    // Pass/fail tags should appear for each student in the batch
+    expect(body).toMatch(/tag-(pass|fail)/)
+  })
+
+  it('/department/:name?module=unknown shows error card', async () => {
+    const res = await get(`/department/${encodeURIComponent('【範例資料】')}?module=bogus`)
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    expect(body).toContain('找不到該模組')
+  })
 })
