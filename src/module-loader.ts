@@ -3,6 +3,31 @@ import type { Module, ModuleCourse, RawModuleData, RawCourseData } from './model
 import { parseCertificationRequirement } from './requirement-parser.ts'
 import { groupCourses } from './grouper.ts'
 
+/**
+ * Normalize the college name (主責單位 隸屬一級單位).
+ *
+ * The raw data contains inconsistent college labels — e.g. three aliases for
+ * 農業暨自然資源學院 (農資學院, 農資院) — and several modules leave the field
+ * blank. Without normalization, the UI splits one college across multiple
+ * buckets and dumps the blank ones under "其他".
+ */
+const COLLEGE_ALIASES: Record<string, string> = {
+  農資學院: '農業暨自然資源學院',
+  農資院: '農業暨自然資源學院',
+}
+
+const UNIT_TO_COLLEGE: Record<string, string> = {
+  中國文學系: '文學院',
+  化學工程學系: '工學院',
+  食品暨應用生物科技學系: '農業暨自然資源學院',
+}
+
+function normalizeCollege(rawCollege: string | null | undefined, unit: string | null | undefined): string {
+  const trimmed = (rawCollege ?? '').trim()
+  if (trimmed) return COLLEGE_ALIASES[trimmed] ?? trimmed
+  return UNIT_TO_COLLEGE[(unit ?? '').trim()] ?? ''
+}
+
 /** Extract credits from 排課資訊 or 規劃要點 field, key "5" */
 function extractCredits(course: RawCourseData): number {
   const sched = course.排課資訊 ?? course.規劃要點
@@ -35,12 +60,13 @@ export function loadModules(filePath: string): readonly Module[] {
     const certification = parseCertificationRequirement(data.模組總表.認證要求)
     const groups = groupCourses(courses)
 
+    const unit = data.基本資訊.主責教學單位
     modules.push({
       key,
       name_zh: data.基本資訊.中文,
       name_en: data.基本資訊.英文,
-      unit: data.基本資訊.主責教學單位,
-      college: data.基本資訊['主責單位 隸屬一級單位'],
+      unit,
+      college: normalizeCollege(data.基本資訊['主責單位 隸屬一級單位'], unit),
       groups,
       all_courses: courses,
       certification,
