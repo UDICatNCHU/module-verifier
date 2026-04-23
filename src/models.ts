@@ -6,6 +6,8 @@ export interface ModuleCourse {
   readonly offering_unit: string
   readonly remark: string | null
   readonly course_codes?: readonly string[]
+  /** If set, only student records from this semester half count as a match. */
+  readonly only_semester?: '上' | '下'
 }
 
 export type RuleType =
@@ -140,4 +142,5 @@ export interface RawCourseData {
   readonly 開課單位: string
   readonly 備註?: string
   readonly 課程代碼?: string
+  readonly 認列學期?: '上' | '下'
 }

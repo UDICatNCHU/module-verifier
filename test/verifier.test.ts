@@ -327,3 +327,77 @@ describe('verifier - multi-code matching (上下學期不同碼)', () => {
     expect(appGroup!.courses_matched).not.toContain('專題研究')
   })
 })
+
+describe('verifier - only_semester filter (認列下學期 等)', () => {
+  const mod = makeModule([
+    {
+      label: '基礎課程',
+      rule: { type: 'min_credits', category: '基礎課程', choose_n: 1, min_credits: 3, notes: [] },
+      courses: [
+        {
+          name_zh: '普通物理學',
+          name_en: 'General Physics',
+          credits: 6,
+          offering_unit: '物理系',
+          remark: '基礎課程(普通物理學認列下學期課程)',
+          course_codes: ['54543'],
+          only_semester: '下',
+        },
+      ],
+    },
+  ])
+
+  it('FAIL: student took 上學期 only — should not match', () => {
+    const student: StudentCourse[] = [
+      { name: '普通物理學', credits: 3, semester: '110-1', course_code: '54543' },
+    ]
+    const result = verifyModule(mod, student)
+    const base = result.group_results[0]
+    expect(base.courses_matched).not.toContain('普通物理學')
+    expect(base.credits_matched).toBe(0)
+  })
+
+  it('PASS: student took 下學期 only — matches and counts 3 credits', () => {
+    const student: StudentCourse[] = [
+      { name: '普通物理學', credits: 3, semester: '110-2', course_code: '54543' },
+    ]
+    const result = verifyModule(mod, student)
+    const base = result.group_results[0]
+    expect(base.courses_matched).toContain('普通物理學')
+    expect(base.credits_matched).toBe(3)
+  })
+
+  it('PASS: student took both semesters — only 下學期 counts (not summed)', () => {
+    const student: StudentCourse[] = [
+      { name: '普通物理學', credits: 3, semester: '110-1', course_code: '54543' },
+      { name: '普通物理學', credits: 3, semester: '110-2', course_code: '54543' },
+    ]
+    const result = verifyModule(mod, student)
+    const base = result.group_results[0]
+    expect(base.courses_matched).toContain('普通物理學')
+    // only 下學期 3 — should NOT sum both to 6
+    expect(base.credits_matched).toBe(3)
+  })
+})
+
+describe('integration: 普通物理學 認列下學期 in 3 real modules', () => {
+  // Regression guard: the 3 modules with 普通物理學 code=54543 must carry
+  // the only_semester='下' flag after loading modules_data.json.
+  const physicsKeys = [
+    '物理學系_半導體物理與應用',
+    '機械工程學系_智慧製造跨製程系統整合與製造應用',
+    '機械工程學系_智慧製造整線聯網分析與智慧管理',
+  ]
+
+  it('all 3 physics/mechanical modules have 普通物理學 with only_semester="下"', () => {
+    for (const key of physicsKeys) {
+      const mod = findModule(modules, key)
+      expect(mod).toBeDefined()
+      // Look up by code 54543 — two of the modules store the name in
+      // dual-language format "（中文）普通物理學 （英文）General Physics".
+      const phys = mod!.all_courses.find(c => c.course_codes?.includes('54543'))
+      expect(phys).toBeDefined()
+      expect(phys!.only_semester).toBe('下')
+    }
+  })
+})

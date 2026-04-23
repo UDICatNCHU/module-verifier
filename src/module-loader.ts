@@ -47,6 +47,7 @@ function parseCourse(raw: RawCourseData): ModuleCourse {
     course_codes: raw.課程代碼
       ? raw.課程代碼.split(',').map(c => c.trim()).filter(c => c)
       : undefined,
+    only_semester: raw.認列學期,
   }
 }
 

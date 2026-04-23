@@ -39,11 +39,26 @@ function buildStudentLookup(studentCourses: readonly StudentCourse[]): StudentLo
   return { byName, byCode }
 }
 
+/**
+ * Filter matches by semester half when the module course has an
+ * `only_semester` restriction (e.g. 「普通物理學認列下學期課程」).
+ * semester format is "YYY-N" where N is 1 (上) or 2 (下).
+ */
+function filterBySemester(
+  matches: readonly StudentCourse[],
+  onlySemester: '上' | '下' | undefined,
+): StudentCourse[] {
+  if (!onlySemester) return [...matches]
+  const suffix = onlySemester === '上' ? '-1' : '-2'
+  return matches.filter(m => m.semester?.endsWith(suffix))
+}
+
 /** Find all student records matching a module course (code-first, then name) */
 function findAllMatches(
   lookup: StudentLookup,
   courseCodes: readonly string[] | undefined,
   courseName: string,
+  onlySemester?: '上' | '下',
 ): StudentCourse[] {
   // Prefer course_codes match when both sides have codes
   if (courseCodes && courseCodes.length > 0) {
@@ -52,11 +67,12 @@ function findAllMatches(
       const byCode = lookup.byCode.get(code)
       if (byCode) results.push(...byCode)
     }
-    if (results.length > 0) return results
+    if (results.length > 0) return filterBySemester(results, onlySemester)
   }
   // Fall back to name match
   const key = normalizeName(courseName)
-  return lookup.byName.get(key) ?? []
+  const byName = lookup.byName.get(key) ?? []
+  return filterBySemester(byName, onlySemester)
 }
 
 /** Check if a student has taken a specific course */
@@ -64,8 +80,9 @@ function findMatch(
   lookup: StudentLookup,
   courseCodes: readonly string[] | undefined,
   courseName: string,
+  onlySemester?: '上' | '下',
 ): StudentCourse | undefined {
-  return findAllMatches(lookup, courseCodes, courseName)[0]
+  return findAllMatches(lookup, courseCodes, courseName, onlySemester)[0]
 }
 
 /** Find match and report how it was matched (code vs name) */
@@ -73,16 +90,19 @@ function findMatchWithMethod(
   lookup: StudentLookup,
   courseCodes: readonly string[] | undefined,
   courseName: string,
+  onlySemester?: '上' | '下',
 ): { course: StudentCourse; method: 'code' | 'name' } | undefined {
   if (courseCodes && courseCodes.length > 0) {
     for (const code of courseCodes) {
-      const byCode = lookup.byCode.get(code)
-      if (byCode && byCode.length > 0) return { course: byCode[0], method: 'code' }
+      const byCode = lookup.byCode.get(code) ?? []
+      const filtered = filterBySemester(byCode, onlySemester)
+      if (filtered.length > 0) return { course: filtered[0], method: 'code' }
     }
   }
   const key = normalizeName(courseName)
-  const byName = lookup.byName.get(key)
-  if (byName && byName.length > 0) return { course: byName[0], method: 'name' }
+  const byName = lookup.byName.get(key) ?? []
+  const filtered = filterBySemester(byName, onlySemester)
+  if (filtered.length > 0) return { course: filtered[0], method: 'name' }
   return undefined
 }
 
@@ -91,8 +111,9 @@ function countSemesters(
   lookup: StudentLookup,
   courseCodes: readonly string[] | undefined,
   courseName: string,
+  onlySemester?: '上' | '下',
 ): number {
-  const matches = findAllMatches(lookup, courseCodes, courseName)
+  const matches = findAllMatches(lookup, courseCodes, courseName, onlySemester)
   if (matches.length === 0) return 0
   const semesters = new Set(matches.map(m => m.semester ?? 'unknown'))
   return semesters.size
@@ -108,8 +129,9 @@ function sumAllCredits(
   lookup: StudentLookup,
   courseCodes: readonly string[] | undefined,
   courseName: string,
+  onlySemester?: '上' | '下',
 ): number {
-  const matches = findAllMatches(lookup, courseCodes, courseName)
+  const matches = findAllMatches(lookup, courseCodes, courseName, onlySemester)
   const seen = new Set<string>()
   let total = 0
   for (const m of matches) {
@@ -133,26 +155,26 @@ function verifyGroup(
 
   // Find which courses in this group the student has taken
   for (const course of group.courses) {
-    const matchResult = findMatchWithMethod(lookup, course.course_codes, course.name_zh)
+    const matchResult = findMatchWithMethod(lookup, course.course_codes, course.name_zh, course.only_semester)
     if (matchResult) {
       const { course: match, method } = matchResult
       // Check for 選修兩學期 — this is a per-COURSE constraint from the original remark,
       // not a group-level one. Check the individual course's remark.
       const courseRequiresTwoSemesters = course.remark?.includes('選修兩學期') ?? false
       if (courseRequiresTwoSemesters) {
-        const semCount = countSemesters(lookup, course.course_codes, course.name_zh)
+        const semCount = countSemesters(lookup, course.course_codes, course.name_zh, course.only_semester)
         if (semCount >= 2) {
           coursesMatched.push(course.name_zh)
           // Sum all semesters' credits, not just the first match — otherwise
           // a 2-semester course ends up counted as a single semester.
-          creditsMatched += sumAllCredits(lookup, course.course_codes, course.name_zh)
+          creditsMatched += sumAllCredits(lookup, course.course_codes, course.name_zh, course.only_semester)
           matchDetails.push({
             module_course_name: course.name_zh,
             student_course_name: match.name,
             student_course_code: match.course_code,
             module_course_codes: course.course_codes,
             match_method: method,
-            credits: sumAllCredits(lookup, course.course_codes, course.name_zh),
+            credits: sumAllCredits(lookup, course.course_codes, course.name_zh, course.only_semester),
             semester: match.semester,
           })
         }
@@ -273,7 +295,7 @@ function verifyCrossGroupModule(
     let tagMatched = false
     for (const g of tagGroups) {
       for (const c of g.courses) {
-        if (findMatch(lookup, c.course_codes, c.name_zh)) {
+        if (findMatch(lookup, c.course_codes, c.name_zh, c.only_semester)) {
           tagMatched = true
           satisfiedCategories.add(tag)
           break
@@ -290,7 +312,7 @@ function verifyCrossGroupModule(
   const l1MatchedNames: string[] = []
   let l1Credits = 0
   for (const c of allL1Courses) {
-    const mr = findMatchWithMethod(lookup, c.course_codes, c.name_zh)
+    const mr = findMatchWithMethod(lookup, c.course_codes, c.name_zh, c.only_semester)
     if (mr) {
       l1MatchedNames.push(c.name_zh)
       l1Credits += mr.course.credits
@@ -328,7 +350,7 @@ function verifyCrossGroupModule(
   const l2MatchedNames: string[] = []
   let l2Credits = 0
   for (const c of l2EligibleCourses) {
-    const mr = findMatchWithMethod(lookup, c.course_codes, c.name_zh)
+    const mr = findMatchWithMethod(lookup, c.course_codes, c.name_zh, c.only_semester)
     if (mr) {
       l2MatchedNames.push(c.name_zh)
       l2Credits += mr.course.credits
@@ -393,9 +415,9 @@ export function verifyModule(
         // regular courses only count the first match (repeats don't stack).
         const twoSem = mc?.remark?.includes('選修兩學期') ?? false
         if (twoSem) {
-          totalCredits += sumAllCredits(lookup, mc?.course_codes, name)
+          totalCredits += sumAllCredits(lookup, mc?.course_codes, name, mc?.only_semester)
         } else {
-          const match = findMatch(lookup, mc?.course_codes, name)
+          const match = findMatch(lookup, mc?.course_codes, name, mc?.only_semester)
           if (match) totalCredits += match.credits
         }
       }
