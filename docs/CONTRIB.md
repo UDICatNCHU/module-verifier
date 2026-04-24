@@ -22,7 +22,7 @@ npm install
 | 檔案 | 必要 | 內容 | 缺少時行為 |
 |------|------|------|-------------|
 | `auth.json` | 🟢 強烈建議 | Basic Auth 帳密,`[{"username":"staff","password":"..."}]` | server 會在無認證下執行(console 有 warning) |
-| `20260420.xlsx` | ⚪ 選配 | 2,120 位真實學生修課紀錄(個資) | 只載入 4 位 `【範例資料】` dummy 學生 |
+| `20260420.xlsx` | 🟢 測試需要 | 2,120 位真實學生修課紀錄(個資) | `STUDENT_MAP` 為空;server 整合測試會 fail |
 | `feedback.json` | ⚪ 自動生成 | 使用者提交的回饋,由 server 寫入 | 首次送出回饋時自動建立 |
 
 **認證格式範例**(`auth.json`):
@@ -61,6 +61,7 @@ npm install
 | `npx tsx scripts/import-course-codes.ts` | 產生匹配報告(科目內碼 ↔ 模組課程) |
 | `npx tsx scripts/import-course-codes.ts --apply` | 寫入 `modules_data.json` 的 `課程代碼` 欄位 |
 | `npx tsx scripts/verify-4dept.ts <系所>` | 單系所批次 verify(CLI 版) |
+| `npx tsx scripts/audit-false-positives.ts` | 掃描過度認證風險;產出 `scripts/output/false-positive-report.{md,json}` |
 
 ## 開發流程
 
@@ -98,13 +99,13 @@ npx vitest run --coverage         # 含覆蓋率
 ```
 src/
   server.ts                       Hono app + routes + layout (~847 行)
-  models.ts                       所有 TypeScript interfaces
-  verifier.ts                     核心驗證引擎
+  models.ts                       所有 TypeScript interfaces (含 only_semester 等結構化欄位)
+  verifier.ts                     核心驗證引擎(sumAllCredits/filterBySemester)
   remark-parser.ts                79 種「備註」pattern 解析
   grouper.ts                      課程分組(by 語意規則鍵)
   module-loader.ts                modules_data.json → Module[]
   requirement-parser.ts           認證要求欄位正規化
-  student-api.ts                  Excel 載入 + dummy students
+  student-api.ts                  Excel 載入(純真實學生,已無 dummy)
   feedback-store.ts               feedback.json 讀寫
   module-overview.ts              單模組:已取得 / 接近取得(含 cache)
   school-overview.ts              全校總覽(含 cache)
@@ -112,7 +113,7 @@ src/
   render-school-overview.ts       /overview 的 HTML
   html-utils.ts                   escapeHtml
 
-test/                             9 個測試檔,208 tests(覆蓋率 97%)
-scripts/                          CLI 工具(import-course-codes、verify-4dept)
-docs/                             本目錄
+test/                             9 個測試檔,212 tests(覆蓋率 97% stmt / 100% func)
+scripts/                          CLI 工具(import-course-codes、verify-4dept、audit-false-positives)
+docs/                             本目錄(含 FALSE_POSITIVE_AUDIT.md)
 ```

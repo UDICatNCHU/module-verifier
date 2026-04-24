@@ -141,6 +141,17 @@ disown
 
 歷史 bug:`hono/basic-auth` 的 `realm` 含非 ASCII 字元時 `WWW-Authenticate` header 序列化失敗。若復發,確認 `src/server.ts` 的 `realm` 仍為純 ASCII(目前是 `'NCHU Module Verifier'`)。
 
+## 週期性稽核(建議)
+
+每次 `modules_data.json` 資料大動、或每學期結束拿到新學生快照時,跑一次過度認證稽核:
+
+```bash
+npx tsx scripts/audit-false-positives.ts
+# 輸出 scripts/output/false-positive-report.{md,json}
+```
+
+檢查 4 類訊號的命中變化:advisory 未執行 / substitute 重複計入 / 一碼多課 / 認列學期未結構化。若有新的高嚴重度命中(見 `docs/FALSE_POSITIVE_AUDIT.md` 的分類標準),需與校方確認規則後更新資料或 verifier。
+
 ## Rollback
 
 本專案無 CI/CD,部署即 `git pull` + 自動 reload。Rollback = `git reset`:
