@@ -401,3 +401,128 @@ describe('integration: 普通物理學 認列下學期 in 3 real modules', () =>
     }
   })
 })
+
+// ─────────────────────────────────────────────────────────
+// False-positive regression: behavior snapshots of known logic holes
+// that *could* over-credit students. These tests pin down CURRENT
+// behavior so any future change surfaces in the diff — they are not
+// claims that the current behavior is correct.
+// ─────────────────────────────────────────────────────────
+
+describe('false-positive snapshots: substitute group over-counting', () => {
+  // A module with BOTH the combined 電子學及實習 course AND the split pair
+  // (電子學 + 電子學實習). If a student takes all three, verifier currently
+  // counts 3 separate module-course matches and sums all their credits.
+  const mod = makeModule([
+    {
+      label: '替代: 電子學及實習',
+      rule: { type: 'substitute', substitutes_for: ['電子學', '電子學實習'], notes: [] },
+      courses: [{
+        name_zh: '電子學及實習', name_en: 'Electronics & Lab',
+        credits: 3, offering_unit: '生機系',
+        remark: '替代課程 || 「電子學」及「電子學實習」',
+      }],
+    },
+    {
+      label: '替代: 電子學 + 電子學實習',
+      rule: { type: 'substitute', substitutes_for: ['電子學及實習'], notes: [] },
+      courses: [
+        { name_zh: '電子學', name_en: 'Electronics', credits: 3, offering_unit: '生機系',
+          remark: '替代課程 || 「電子學及實習」' },
+        { name_zh: '電子學實習', name_en: 'Electronics Lab', credits: 1, offering_unit: '生機系',
+          remark: '替代課程 || 「電子學及實習」' },
+      ],
+    },
+  ])
+
+  it('SNAPSHOT: a student who took all 3 courses gets ALL counted into total', () => {
+    const student: StudentCourse[] = [
+      { name: '電子學及實習', credits: 3 },
+      { name: '電子學', credits: 3 },
+      { name: '電子學實習', credits: 1 },
+    ]
+    const result = verifyModule(mod, student)
+    // Current behavior: 3 module courses matched, credits summed = 3 + 3 + 1 = 7.
+    // If the module designer intended substitute to be an alternative (choose
+    // one branch), this is over-counting. Pinned for future review.
+    expect(result.total_courses_matched).toBe(3)
+    expect(result.total_credits_matched).toBe(7)
+  })
+
+  it('SNAPSHOT: a student who took only the combined course passes the module', () => {
+    const student: StudentCourse[] = [{ name: '電子學及實習', credits: 3 }]
+    const result = verifyModule(mod, student)
+    // One of the two substitute groups is satisfied → subsSatisfied = true
+    // (OR across substitute groups). Module passes if certification thresholds
+    // are met — here cert asks 4/12, and we only have 1/3, so expect fail.
+    expect(result.is_certified).toBe(false)
+    expect(result.total_courses_matched).toBe(1)
+  })
+})
+
+describe('false-positive snapshots: one code → multiple module course names', () => {
+  // Simulates the real-world situation where code "40614" is listed under
+  // three different names across modules (電子學 / 電子學一 / 電子學二).
+  // A student taking any single record with code 40614 can match all three
+  // module entries via code-first matching.
+  const modA = makeModule([
+    {
+      label: '電子學',
+      rule: { type: 'required', notes: [] },
+      courses: [{ name_zh: '電子學', name_en: 'Electronics', credits: 3,
+        offering_unit: '電機系', remark: null, course_codes: ['40614'] }],
+    },
+  ])
+  const modB = makeModule([
+    {
+      label: '電子學一',
+      rule: { type: 'required', notes: [] },
+      courses: [{ name_zh: '電子學一', name_en: 'Electronics I', credits: 3,
+        offering_unit: '電機系', remark: null, course_codes: ['40614'] }],
+    },
+  ])
+
+  it('SNAPSHOT: one student record with code 40614 matches both module A and B', () => {
+    const student: StudentCourse[] = [
+      { name: '電子學', credits: 3, semester: '112-1', course_code: '40614' },
+    ]
+    // Both modules see this single student course as a match for their own
+    // entry. This is the intended "code-first" behavior, but when the code
+    // table itself contains ambiguous mappings (as 40614 does in real data),
+    // it can silently cross-credit.
+    expect(verifyGroupCourseMatched(modA, '電子學', student)).toBe(true)
+    expect(verifyGroupCourseMatched(modB, '電子學一', student)).toBe(true)
+  })
+})
+
+describe('false-positive snapshots: free-text advisory not enforced', () => {
+  // Parser collects advisory phrases into rule.notes but verifier does not
+  // act on them. Pinned to surface any future enforcement change.
+  const mod = makeModule([
+    {
+      label: '[基礎課程] 統計學(二)',
+      rule: { type: 'required', category: '基礎課程',
+        notes: ['(只承認管理學院所開設課程)'] },
+      courses: [{ name_zh: '統計學(二)', name_en: 'Statistics II', credits: 3,
+        offering_unit: '企管系', remark: '基礎課程 (只承認管理學院所開設課程)',
+        course_codes: ['34648'] }],
+    },
+  ])
+
+  it('SNAPSHOT: student course matches even without provenance check', () => {
+    const student: StudentCourse[] = [
+      // We cannot tell from StudentCourse whether this was taken at 管院
+      { name: '統計學(二)', credits: 3, semester: '112-1', course_code: '34648' },
+    ]
+    const result = verifyModule(mod, student)
+    expect(result.group_results[0].courses_matched).toContain('統計學(二)')
+    // The advisory is parsed into the rule's notes but not enforced
+    expect(result.group_results[0].rule.notes.some(n => n.includes('只承認'))).toBe(true)
+  })
+})
+
+/** Small helper: did this module's named course get matched for the student? */
+function verifyGroupCourseMatched(mod: import('../src/models.ts').Module, name: string, student: StudentCourse[]): boolean {
+  const r = verifyModule(mod, student)
+  return r.group_results.some(g => g.courses_matched.includes(name))
+}
