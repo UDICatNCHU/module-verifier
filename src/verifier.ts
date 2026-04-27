@@ -176,6 +176,7 @@ function verifyGroup(
             match_method: method,
             credits: sumAllCredits(lookup, course.course_codes, course.name_zh, course.only_semester),
             semester: match.semester,
+            score: match.grade,
           })
         }
       } else {
@@ -189,6 +190,7 @@ function verifyGroup(
           match_method: method,
           credits: match.credits,
           semester: match.semester,
+          score: match.grade,
         })
       }
     }

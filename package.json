@@ -11,10 +11,14 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.12",
+    "archiver": "^7.0.1",
+    "docxtemplater": "^3.68.6",
     "hono": "^4.0.0",
+    "pizzip": "^3.2.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^3.2.4",
     "tsx": "^4.0.0",

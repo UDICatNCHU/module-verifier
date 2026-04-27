@@ -84,6 +84,8 @@ export interface CourseMatchDetail {
   readonly match_method: 'code' | 'name'
   readonly credits: number
   readonly semester?: string
+  /** Raw grade from student record — for certificate display ("89", "P", "Y" etc.) */
+  readonly score?: string
 }
 
 /** Verification result for a single group */

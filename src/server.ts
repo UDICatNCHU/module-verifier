@@ -12,6 +12,9 @@ import { renderModuleIndex, renderModuleOverview } from './render-module-overvie
 import { getSchoolOverview } from './school-overview.ts'
 import { renderSchoolOverview } from './render-school-overview.ts'
 import { escapeHtml } from './html-utils.ts'
+import { generateCertDocx } from './cert-generator.ts'
+import { docxToPdf, libreOfficeAvailable } from './cert-pdf.ts'
+import archiver from 'archiver'
 import type { Module, StudentCourse, StudentInfo, VerificationResult, CourseMatchDetail } from './models.ts'
 
 const DATA_PATH = resolve(import.meta.dirname, '../modules_data.json')
@@ -690,6 +693,99 @@ app.get('/api/modules/:key', (c) => {
   return c.json(mod)
 })
 
+// ─── Certificate endpoints ───
+
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+async function getCertBuffer(
+  studentId: string, moduleKey: string, format: 'pdf' | 'docx',
+): Promise<{ buffer: Buffer; filename: string } | { error: string; status: 404 | 422 | 500 }> {
+  const student = await fetchStudentInfo(studentId)
+  if (!student) return { error: '找不到該學生', status: 404 }
+  const mod = findModule(modules, moduleKey)
+  if (!mod) return { error: '找不到該模組', status: 404 }
+  const result = verifyModule(mod, student.courses)
+  if (!result.is_certified) return { error: '此學生尚未取得該模組認證,無法發證', status: 422 }
+  let docx: Buffer
+  try { docx = generateCertDocx(student, mod, result) }
+  catch (e) { return { error: `產生 DOCX 失敗: ${(e as Error).message}`, status: 500 } }
+  const safeName = `${student.student_id}_${mod.key}`.replace(/[^\w_-]/g, '')
+  if (format === 'docx') return { buffer: docx, filename: `${safeName}.docx` }
+  try {
+    const pdf = await docxToPdf(docx)
+    return { buffer: pdf, filename: `${safeName}.pdf` }
+  } catch (e) {
+    return { error: `PDF 轉換失敗(LibreOffice 可能未安裝): ${(e as Error).message}`, status: 500 }
+  }
+}
+
+app.get('/cert/:studentId/:moduleKey/docx', async (c) => {
+
+  const r = await getCertBuffer(c.req.param('studentId'), c.req.param('moduleKey'), 'docx')
+  if ('error' in r) return c.json({ error: r.error }, r.status)
+  return new Response(r.buffer, {
+    status: 200,
+    headers: {
+      'Content-Type': DOCX_MIME,
+      'Content-Disposition': `attachment; filename="${r.filename}"`,
+    },
+  })
+})
+
+app.get('/cert/:studentId/:moduleKey/pdf', async (c) => {
+  const r = await getCertBuffer(c.req.param('studentId'), c.req.param('moduleKey'), 'pdf')
+  if ('error' in r) return c.json({ error: r.error }, r.status)
+  return new Response(r.buffer, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${r.filename}"`,
+    },
+  })
+})
+
+/** Batch: GET /cert/batch/module/:key — all certified students for a module (ZIP) */
+app.get('/cert/batch/module/:key', async (c) => {
+  const key = c.req.param('key')
+  const format = c.req.query('format') === 'docx' ? 'docx' : 'pdf'
+  const mod = findModule(modules, key)
+  if (!mod) return c.json({ error: '找不到該模組' }, 404)
+  if (format === 'pdf' && !await libreOfficeAvailable()) {
+    return c.json({ error: 'LibreOffice 未安裝,無法批次產 PDF;改用 ?format=docx' }, 500)
+  }
+
+  const students = getAllStudents()
+  const archive = archiver('zip', { zlib: { level: 9 } })
+  const chunks: Uint8Array[] = []
+  archive.on('data', d => chunks.push(d))
+  const done = new Promise<Buffer>(res => archive.on('end', () => res(Buffer.concat(chunks))))
+
+  let count = 0
+  for (const s of students) {
+    const r = verifyModule(mod, s.courses)
+    if (!r.is_certified) continue
+    try {
+      const docx = generateCertDocx(s, mod, r)
+      const buf = format === 'docx' ? docx : await docxToPdf(docx)
+      const fname = `${s.student_id}_${s.name}.${format}`.replace(/[\\/:*?"<>|]/g, '_')
+      archive.append(buf, { name: fname })
+      count++
+    } catch (e) {
+      console.error(`[cert-batch] failed for ${s.student_id}: ${(e as Error).message}`)
+    }
+  }
+  await archive.finalize()
+  const zip = await done
+  const safeKey = mod.key.replace(/[^\w_-]/g, '')
+  return new Response(zip, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="certs_${safeKey}_${count}.zip"`,
+    },
+  })
+})
+
 // ─── Render verification result ───
 function renderResult(result: VerificationResult, mod: Module, student: StudentInfo): string {
   const statusClass = result.is_certified ? 'result-pass' : 'result-fail'
@@ -827,6 +923,14 @@ function renderResult(result: VerificationResult, mod: Module, student: StudentI
     ${unmetHtml}
 
     ${feedbackHtml}
+
+    ${result.is_certified ? `
+    <div class="card" style="text-align: center;">
+      <h2>下載證明書</h2>
+      <a href="/cert/${encodeURIComponent(student.student_id)}/${encodeURIComponent(mod.key)}/pdf" class="btn">下載 PDF</a>
+      <a href="/cert/${encodeURIComponent(student.student_id)}/${encodeURIComponent(mod.key)}/docx" class="btn btn-secondary" style="margin-left: 8px;">下載 DOCX</a>
+    </div>
+    ` : ''}
 
     <div style="text-align: center; margin-top: 20px;">
       <a href="/student?id=${encodeURIComponent(student.student_id)}" class="btn btn-secondary">檢核其他模組</a>

@@ -78,7 +78,14 @@ function renderPassSection(
     return `<div class="card"><h2>取得學生</h2><p style="color:#888;">目前尚無學生取得此模組認證</p></div>`
   }
 
-  let html = `<div class="card"><h2>取得學生 (按系所分組)</h2>`
+  let html = `<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">取得學生 (按系所分組)</h2>
+      <div>
+        <a href="/cert/batch/module/${encodeURIComponent(mod.key)}?format=pdf" class="btn btn-sm">⬇ 批次下載 PDF</a>
+        <a href="/cert/batch/module/${encodeURIComponent(mod.key)}?format=docx" class="btn btn-sm btn-secondary" style="margin-left:6px;">DOCX</a>
+      </div>
+    </div>`
   const sorted = [...passGroups.entries()].sort((a, b) => b[1].length - a[1].length)
   for (const [dept, entries] of sorted) {
     html += `<div class="college-name">${escapeHtml(dept)} — ${entries.length} 人</div>`
