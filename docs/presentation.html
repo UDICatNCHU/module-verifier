@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>中興大學 領域模組認證 — 數據概況</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+<style>
+  :root {
+    --primary: #003366;     /* 中興深藍 */
+    --accent:  #b8860b;     /* 中興金 */
+    --green:   #2e7d32;
+    --orange:  #ef6c00;
+    --gray:    #757575;
+    --bg-soft: #f7f9fc;
+  }
+  body, .reveal { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; }
+  .reveal section { text-align: left; }
+  .reveal h1 { color: var(--primary); font-weight: 700; letter-spacing: 2px; }
+  .reveal h2 { color: var(--primary); font-weight: 700; border-bottom: 3px solid var(--accent); padding-bottom: 8px; display: inline-block; }
+  .reveal h3 { color: var(--primary); }
+  .reveal .cover { text-align: center; padding-top: 80px; }
+  .reveal .cover h1 { font-size: 2.8em; margin-bottom: 30px; }
+  .reveal .cover .sub { font-size: 1.4em; color: var(--gray); }
+  .reveal .cover .footer { position: absolute; bottom: 40px; left: 0; right: 0; text-align: center; color: var(--gray); font-size: 0.7em; }
+  .big-stat { display: flex; gap: 40px; justify-content: center; margin: 60px 0; flex-wrap: wrap; }
+  .big-stat .stat { text-align: center; padding: 30px 40px; background: var(--bg-soft); border-radius: 16px; min-width: 200px; }
+  .big-stat .stat .num { font-size: 3.5em; font-weight: 800; color: var(--primary); line-height: 1; }
+  .big-stat .stat .label { font-size: 0.95em; color: var(--gray); margin-top: 10px; }
+  .reveal table { font-size: 0.62em; margin: 0 auto; border-collapse: collapse; width: 100%; }
+  .reveal table th { background: var(--primary); color: white; padding: 8px 12px; text-align: left; }
+  .reveal table td { padding: 6px 12px; border-bottom: 1px solid #e0e0e0; }
+  .reveal table tr:nth-child(even) td { background: var(--bg-soft); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.85em; font-weight: 600; }
+  .badge-green { background: #e8f5e9; color: var(--green); }
+  .badge-orange { background: #fff3e0; color: var(--orange); }
+  .reveal .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start; }
+  .insight-box { padding: 16px 20px; background: #fff8e1; border-left: 5px solid var(--accent); border-radius: 4px; margin-top: 20px; }
+  .insight-box::before { content: "💡 "; font-weight: bold; }
+  .timeline { list-style: none; padding-left: 0; font-size: 0.65em; }
+  .timeline li { padding: 6px 0; padding-left: 28px; position: relative; }
+  .timeline li::before { content: "●"; position: absolute; left: 0; color: var(--accent); font-size: 1.2em; }
+  .timeline li b { color: var(--primary); }
+  canvas { max-width: 100%; }
+  footer.foot { position: absolute; bottom: 18px; right: 30px; color: var(--gray); font-size: 0.5em; }
+</style>
+</head>
+<body>
+
+<div class="reveal">
+<div class="slides">
+
+<!-- ─── 1. Cover ─── -->
+<section class="cover">
+  <h1>領域模組認證系統<br>數據概況與洞察</h1>
+  <div class="sub">National Chung Hsing University<br>Modular Program Certification Dashboard</div>
+  <div class="footer">資料快照:2026-04-20 學生紀錄&nbsp; · &nbsp;73 模組 × 2,120 學生<br>https://cert.nlpnchu.org</div>
+</section>
+
+<!-- ─── 2. 一頁看懂規模 ─── -->
+<section>
+  <h2>系統規模一覽</h2>
+  <div class="big-stat">
+    <div class="stat"><div class="num" style="color:var(--primary)">73</div><div class="label">領域模組<br>橫跨 8 個學院</div></div>
+    <div class="stat"><div class="num" style="color:var(--primary)">2,120</div><div class="label">在學學生資料<br>16 萬筆修課紀錄</div></div>
+    <div class="stat"><div class="num" style="color:var(--green)">972</div><div class="label">可發出之認證<br>34 個模組已有取得者</div></div>
+    <div class="stat"><div class="num" style="color:var(--accent)">749</div><div class="label">取得認證學生<br>(35.3% 全體覆蓋)</div></div>
+  </div>
+  <div class="insight-box">
+    平均每位「取得認證者」拿到 <b>1.30 個</b> 模組認證 — 顯示現有設計鼓勵跨領域選修。
+  </div>
+</section>
+
+<!-- ─── 3. 學院分佈圓餅 ─── -->
+<section>
+  <h2>各學院認證發放分佈</h2>
+  <div class="two-col">
+    <div><canvas id="collegeChart" height="280"></canvas></div>
+    <div>
+      <table>
+        <thead><tr><th>學院</th><th>模組數</th><th>認證數</th></tr></thead>
+        <tbody>
+          <tr><td>農業暨自然資源學院</td><td>24</td><td><b>478</b></td></tr>
+          <tr><td>理學院</td><td>3</td><td>127</td></tr>
+          <tr><td>工學院</td><td>5</td><td>108</td></tr>
+          <tr><td>法政學院</td><td>6</td><td>104</td></tr>
+          <tr><td>管理學院</td><td>5</td><td>102</td></tr>
+          <tr><td>生命科學院</td><td>3</td><td>43</td></tr>
+          <tr><td>文學院</td><td>1</td><td>9</td></tr>
+          <tr><td>電資學院</td><td>1</td><td>1</td></tr>
+        </tbody>
+      </table>
+      <div class="insight-box" style="font-size:0.7em;">
+        <b>農資學院 49% 認證</b>(478/972),反映該學院模組制度成熟、學生選修積極。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 4. 取得模組數分佈 ─── -->
+<section>
+  <h2>學生取得模組數分佈</h2>
+  <div class="two-col">
+    <div><canvas id="distChart" height="260"></canvas></div>
+    <div>
+      <table>
+        <thead><tr><th>取得數</th><th>學生數</th><th>佔比</th></tr></thead>
+        <tbody>
+          <tr><td>0 個</td><td>1,371</td><td>64.7%</td></tr>
+          <tr><td>1 個</td><td><b>550</b></td><td>25.9%</td></tr>
+          <tr><td>2 個</td><td>178</td><td>8.4%</td></tr>
+          <tr><td>3 個</td><td>18</td><td>0.8%</td></tr>
+          <tr><td>4 個以上</td><td>3</td><td>0.1%</td></tr>
+        </tbody>
+      </table>
+      <div class="insight-box" style="font-size:0.7em;">
+        <b>有 35% 學生取得至少 1 個模組認證</b>;其中 <b>9%</b> 取得 2 個以上,展現跨域學習動能。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 5. Top 模組 ─── -->
+<section>
+  <h2>Top 10 取得人數模組</h2>
+  <table>
+    <thead><tr><th>#</th><th>模組</th><th>主責單位</th><th>學院</th><th>取得人數</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>動物遺傳生理模組</td><td>動物科學系</td><td>農資學院</td><td><b>54</b></td></tr>
+      <tr><td>2</td><td>動物生產模組</td><td>動物科學系</td><td>農資學院</td><td><b>54</b></td></tr>
+      <tr><td>3</td><td>半導體物理與應用</td><td>物理系</td><td>理學院</td><td>50</td></tr>
+      <tr><td>4</td><td>民法親屬繼承</td><td>法律學系</td><td>法政學院</td><td>49</td></tr>
+      <tr><td>5</td><td>金屬材料工程</td><td>材料科學與工程學系</td><td>工學院</td><td>46</td></tr>
+      <tr><td>6</td><td>植物病害管理</td><td>植物病理學系</td><td>農資學院</td><td>45</td></tr>
+      <tr><td>7</td><td>計算數學</td><td>應用數學系</td><td>理學院</td><td>44</td></tr>
+      <tr><td>8</td><td>會計審計核心課程</td><td>會計學系</td><td>管理學院</td><td>39</td></tr>
+      <tr><td>9</td><td>花卉專業</td><td>園藝學系</td><td>農資學院</td><td>39</td></tr>
+      <tr><td>10</td><td>森林生物</td><td>森林學系</td><td>農資學院</td><td>38</td></tr>
+    </tbody>
+  </table>
+  <div class="insight-box">
+    <b>Top 10 模組覆蓋 458 張認證(47% 全校總量)</b> — 顯示少數熱門模組驅動主要學習路徑。
+  </div>
+</section>
+
+<!-- ─── 6. Top 系所 ─── -->
+<section>
+  <h2>Top 10 取得學生比例之系所</h2>
+  <div class="two-col">
+    <div><canvas id="deptChart" height="320"></canvas></div>
+    <div>
+      <table>
+        <thead><tr><th>系所</th><th>取得 / 全系</th><th>比例</th></tr></thead>
+        <tbody>
+          <tr><td><b>動科系</b></td><td>54 / 55</td><td><span class="badge badge-green">98.2%</span></td></tr>
+          <tr><td>植病系</td><td>43 / 45</td><td><span class="badge badge-green">95.6%</span></td></tr>
+          <tr><td>園藝系</td><td>44 / 50</td><td><span class="badge badge-green">88.0%</span></td></tr>
+          <tr><td>法律系</td><td>46 / 53</td><td><span class="badge badge-green">86.8%</span></td></tr>
+          <tr><td>森林系</td><td>62 / 75</td><td>82.7%</td></tr>
+          <tr><td>會計系</td><td>34 / 42</td><td>81.0%</td></tr>
+          <tr><td>物理系</td><td>50 / 68</td><td>73.5%</td></tr>
+          <tr><td>材料系</td><td>45 / 63</td><td>71.4%</td></tr>
+          <tr><td>應數系</td><td>52 / 80</td><td>65.0%</td></tr>
+          <tr><td>生科系</td><td>37 / 91</td><td>40.7%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="insight-box">
+    <b>動科系全系 55 位學生中 54 位取得認證(98.2%)</b> — 全校最高。系所模組與必修高度對齊是關鍵。
+  </div>
+</section>
+
+<!-- ─── 7. Insight 1: Curriculum-Module Alignment ─── -->
+<section>
+  <h2>洞察一:課程設計與模組契合度</h2>
+  <h3 style="margin-top:30px;">高契合度系所(取得率 ≥ 85%)</h3>
+  <p style="font-size:0.85em;">動科系、植病系、園藝系、法律系 — 此四系的<b>系上必修課與模組要求高度重疊</b>,學生「自然」就會通過模組認證。</p>
+  <h3>中契合度(50-80%)</h3>
+  <p style="font-size:0.85em;">應數系、生科系、會計系等 — 學生需主動選修部分課程才能滿足模組要求。</p>
+  <h3>低契合度(< 30%)</h3>
+  <p style="font-size:0.85em;">部分管理學院、文學院系所 — 模組設計仍以「鼓勵跨系」為主,需推廣才會有量。</p>
+  <div class="insight-box">
+    若希望提升整體取得率,建議與「中契合度」系所合作將模組要求融入學分學程或微學程,可預期翻倍成長。
+  </div>
+</section>
+
+<!-- ─── 8. Insight 2: Student Behavior Pattern ─── -->
+<section>
+  <h2>洞察二:學生跨域行為</h2>
+  <div class="big-stat" style="margin:40px 0;">
+    <div class="stat"><div class="num" style="color:var(--green)">9.3%</div><div class="label">取得 ≥2 個模組<br>(199 / 2,120 學生)</div></div>
+    <div class="stat"><div class="num" style="color:var(--accent)">21</div><div class="label">取得 ≥3 個模組<br>(超積極跨域者)</div></div>
+    <div class="stat"><div class="num" style="color:var(--primary)">1.30</div><div class="label">平均每位取得者<br>取得模組數</div></div>
+  </div>
+  <div class="insight-box">
+    <b>多模組取得者多分佈於農資學院</b>(共用基礎課程如「生物化學」、「動物解剖生理學」可同時計入多個模組),反映**模組課程共用率**是雙刃劍 — 對學生有利、對「不同模組差異化」是挑戰。
+  </div>
+</section>
+
+<!-- ─── 9. 系統建置歷程 ─── -->
+<section>
+  <h2>系統建置與資料治理歷程</h2>
+  <ul class="timeline">
+    <li><b>2026-04 上旬</b>:系統上線,完成 73 個模組規則自動驗證引擎(5 種規則型別涵蓋 79 種「備註」寫法)</li>
+    <li><b>4/12</b>:抽樣 10 位學生人工核對,系統判定 <b>10/10 一致</b></li>
+    <li><b>4/21–23</b>:Bug 修復(雙重 URL decode、feedback 防呆等)+ 上線 HTTP Basic Auth + 增加 /overview /modules 三個 view</li>
+    <li><b>4/23–24</b>:全年課語意修正(經濟學原理、動物解剖生理學、材料科學導論、生物化學、普通物理學等 5 個 commits),認證從 <b>823 張救回 149 張</b> 至 972 張</li>
+    <li><b>4/24</b>:過度認證稽核(False Positive Audit)— 4 類風險訊號全盤掃描,移交教務處決策</li>
+    <li><b>4/27</b>:證書產生器上線(DOCX + PDF 批次下載),動物生產模組 54 張 4 秒生成</li>
+    <li><b>4/28</b>:成績顯示策略升級為「最高分」(對學生最有利)</li>
+  </ul>
+</section>
+
+<!-- ─── 10. 品質保證 ─── -->
+<section>
+  <h2>系統品質保證</h2>
+  <div class="two-col">
+    <div>
+      <h3>自動化測試</h3>
+      <table>
+        <tbody>
+          <tr><td>測試數</td><td><b>220 / 220 通過</b></td></tr>
+          <tr><td>程式碼覆蓋率</td><td>97.1% statements / 100% functions</td></tr>
+          <tr><td>整合測試</td><td>30 個 server route 全測</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>稽核工具</h3>
+      <ul style="font-size:0.8em;">
+        <li><code>audit-false-positives.ts</code><br>偵測 4 類過度認證風險</li>
+        <li><code>audit-cert-scores.ts</code><br>逐張證書與原始紀錄對帳</li>
+        <li><code>verify-4dept.ts</code><br>各系所批次驗證 CLI</li>
+      </ul>
+    </div>
+  </div>
+  <div class="insight-box">
+    每一張可發出之證書都可追溯到驗證邏輯與原始修課紀錄;制度透明、可審計。
+  </div>
+</section>
+
+<!-- ─── 11. 證書發放 ─── -->
+<section>
+  <h2>證書產出能力</h2>
+  <div class="two-col">
+    <div>
+      <h3>可發放</h3>
+      <ul>
+        <li>單張下載:DOCX(<100ms)/ PDF(~6s)</li>
+        <li>批次下載:全模組 ZIP</li>
+        <li>動物生產 54 張 ≈ <b>4 秒(DOCX)</b> / <b>4 分鐘(PDF)</b></li>
+        <li>樣板沿用教務處原有設計</li>
+      </ul>
+      <h3>已驗證內容項</h3>
+      <ul style="font-size:0.85em;">
+        <li>學生中文姓名、學號</li>
+        <li>模組中英文名</li>
+        <li>申請日期(民國 + 西元)</li>
+        <li>修課明細(含學分、最高成績)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>建議首批試發</h3>
+      <table>
+        <thead><tr><th>模組</th><th>張數</th></tr></thead>
+        <tbody>
+          <tr><td>動物生產模組</td><td>54</td></tr>
+          <tr><td>動物遺傳生理模組</td><td>54</td></tr>
+          <tr><td>民法親屬繼承</td><td>49</td></tr>
+          <tr><td>森林生物</td><td>38</td></tr>
+          <tr><td>植物病害管理</td><td>45</td></tr>
+        </tbody>
+        <tfoot><tr><td><b>合計</b></td><td><b>240 張</b></td></tr></tfoot>
+      </table>
+      <p style="font-size:0.7em; color:var(--gray);">※ 已通過全年課修正 + 規則對齊驗證</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 12. Closing ─── -->
+<section class="cover" style="padding-top:120px;">
+  <h1 style="font-size:2.4em;">下一步</h1>
+  <div style="max-width:760px; margin:40px auto; font-size:1.1em; line-height:1.9; text-align:left;">
+    <p>✦ 與相關系所主責單位確認剩餘 <b>~14 位</b> 學生的全年課語意</p>
+    <p>✦ 與校方確認過度認證稽核 4 類訊號處理方針(法律系法緒、code 衝突等)</p>
+    <p>✦ 開始**首波試辦發證**(動科系 108 張)</p>
+    <p>✦ 串接真實學生 API 取代 Excel 快照,進入動態運作</p>
+  </div>
+  <div class="footer">https://cert.nlpnchu.org · 教務處 / 國立中興大學</div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  Reveal.initialize({ hash: true, slideNumber: 'c/t', transition: 'slide', center: false, width: 1280, height: 760 });
+
+  // College donut
+  new Chart(document.getElementById('collegeChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['農資', '理', '工', '法政', '管理', '生科', '文', '電資'],
+      datasets: [{
+        data: [478, 127, 108, 104, 102, 43, 9, 1],
+        backgroundColor: ['#003366','#1976d2','#388e3c','#7b1fa2','#b8860b','#00897b','#c62828','#616161']
+      }]
+    },
+    options: { plugins: { legend: { position: 'right' } } }
+  });
+
+  // Distribution bar
+  new Chart(document.getElementById('distChart'), {
+    type: 'bar',
+    data: {
+      labels: ['0 個','1 個','2 個','3 個','4+ 個'],
+      datasets: [{
+        label: '學生數',
+        data: [1371, 550, 178, 18, 3],
+        backgroundColor: ['#bdbdbd','#42a5f5','#26a69a','#ffa726','#ef5350']
+      }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { type: 'logarithmic', title: { display: true, text: '學生數(對數軸)' } } } }
+  });
+
+  // Dept horizontal bar
+  new Chart(document.getElementById('deptChart'), {
+    type: 'bar',
+    data: {
+      labels: ['動科系','植病系','園藝系','法律系','森林系','會計系','物理系','材料系','應數系','生科系'],
+      datasets: [{
+        label: '取得率 %',
+        data: [98.2, 95.6, 88.0, 86.8, 82.7, 81.0, 73.5, 71.4, 65.0, 40.7],
+        backgroundColor: '#003366'
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: { x: { max: 100, title: { display: true, text: '%' } } }
+    }
+  });
+</script>
+</body>
+</html>
