@@ -326,6 +326,7 @@ function verifyCrossGroupModule(
         match_method: mr.method,
         credits: mr.course.credits,
         semester: mr.course.semester,
+        score: mr.course.grade,
       })
     }
   }
@@ -364,6 +365,7 @@ function verifyCrossGroupModule(
         match_method: mr.method,
         credits: mr.course.credits,
         semester: mr.course.semester,
+        score: mr.course.grade,
       })
     }
   }
