@@ -92,15 +92,14 @@ describe('cert score snapshots: 選修兩學期 course', () => {
     ],
   }
 
-  it('SNAPSHOT: prints the FIRST semester score for 選修兩學期 course (78, not 92)', () => {
+  it('SNAPSHOT: prints the HIGHEST score for 選修兩學期 course (92, not 78)', () => {
     const result = verifyModule(mod, passingStudent.courses)
     expect(result.is_certified).toBe(true)
     const ctx = buildCertContext(passingStudent, mod, result, new Date('2026-04-28T08:00:00+08:00'))
     const bio = ctx.courses.find(c => c.name_zh === '生物化學')!
-    // Pinned: current behavior shows 上學期 78, NOT 下學期 92.
-    // If staff later prefers max/avg/both, this test will fail and prompt review.
-    expect(bio.score).toBe('78')
-    // Credits are summed across both semesters (Bug #2 fix)
+    // Best-for-student policy: among 78 / 92, cert shows 92.
+    expect(bio.score).toBe('92')
+    // Credits are still summed across both semesters
     expect(bio.credits).toBe(6)
   })
 })
@@ -126,8 +125,8 @@ describe('cert score snapshots: retake (different-semester repeat)', () => {
     expect(result.is_certified).toBe(true)
     const ctx = buildCertContext(student, mod, result, new Date('2026-04-28T08:00:00+08:00'))
     const intro = ctx.courses.find(c => c.name_zh === '動物科學概論')!
-    // Pinned: shows the first attempt's 60, not the retake 95.
-    expect(intro.score).toBe('60')
+    // Best-for-student: shows the retake's 95, not the first attempt's 60.
+    expect(intro.score).toBe('95')
   })
 })
 

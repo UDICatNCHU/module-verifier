@@ -53,6 +53,27 @@ function filterBySemester(
   return matches.filter(m => m.semester?.endsWith(suffix))
 }
 
+/**
+ * Numeric grade rank for "best for student" sorting on certificates.
+ * Y / P (抵免/通過) outrank any numeric grade so they're not displaced.
+ * Empty / unparseable grades sink to the bottom.
+ */
+function gradeRank(grade: string | undefined): number {
+  if (grade === 'Y' || grade === 'P') return 101
+  const n = Number(grade)
+  return Number.isFinite(n) ? n : -1
+}
+
+/** Pick the single match most favorable to the student (highest grade). */
+function pickBestMatch(matches: readonly StudentCourse[]): StudentCourse | undefined {
+  if (matches.length === 0) return undefined
+  let best = matches[0]
+  for (let i = 1; i < matches.length; i++) {
+    if (gradeRank(matches[i].grade) > gradeRank(best.grade)) best = matches[i]
+  }
+  return best
+}
+
 /** Find all student records matching a module course (code-first, then name) */
 function findAllMatches(
   lookup: StudentLookup,
@@ -75,17 +96,21 @@ function findAllMatches(
   return filterBySemester(byName, onlySemester)
 }
 
-/** Check if a student has taken a specific course */
+/** Check if a student has taken a specific course (returns the BEST grade match) */
 function findMatch(
   lookup: StudentLookup,
   courseCodes: readonly string[] | undefined,
   courseName: string,
   onlySemester?: '上' | '下',
 ): StudentCourse | undefined {
-  return findAllMatches(lookup, courseCodes, courseName, onlySemester)[0]
+  return pickBestMatch(findAllMatches(lookup, courseCodes, courseName, onlySemester))
 }
 
-/** Find match and report how it was matched (code vs name) */
+/**
+ * Find match and report how it was matched (code vs name).
+ * Among multiple matches, returns the one with the **highest grade** so the
+ * cert shows the student's best performance.
+ */
 function findMatchWithMethod(
   lookup: StudentLookup,
   courseCodes: readonly string[] | undefined,
@@ -93,16 +118,19 @@ function findMatchWithMethod(
   onlySemester?: '上' | '下',
 ): { course: StudentCourse; method: 'code' | 'name' } | undefined {
   if (courseCodes && courseCodes.length > 0) {
+    // Pool ALL records across all listed codes, then pick the best.
+    const pool: StudentCourse[] = []
     for (const code of courseCodes) {
       const byCode = lookup.byCode.get(code) ?? []
-      const filtered = filterBySemester(byCode, onlySemester)
-      if (filtered.length > 0) return { course: filtered[0], method: 'code' }
+      pool.push(...filterBySemester(byCode, onlySemester))
     }
+    const best = pickBestMatch(pool)
+    if (best) return { course: best, method: 'code' }
   }
   const key = normalizeName(courseName)
   const byName = lookup.byName.get(key) ?? []
-  const filtered = filterBySemester(byName, onlySemester)
-  if (filtered.length > 0) return { course: filtered[0], method: 'name' }
+  const best = pickBestMatch(filterBySemester(byName, onlySemester))
+  if (best) return { course: best, method: 'name' }
   return undefined
 }
 
